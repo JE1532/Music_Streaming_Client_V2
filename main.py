@@ -39,7 +39,7 @@ def main():
     print('connected!')
     threads = []
     rec_queue = Queue()
-    receiver = Receiver(lambda: sock.recv(100000), rec_queue)
+    receiver = Receiver(lambda: sock.recv(200000), rec_queue)
     receiver_thread = threading.Thread(target=receiver.start)
     threads.append(receiver_thread)
     stream_queue = multiprocessing.Queue()

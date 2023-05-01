@@ -12,11 +12,13 @@ import sys
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
+from enum import Enum
 
 class Record:
-    def __init__(self, name, picture_path, likes, listennings):
+    def __init__(self, name, picture_path, likes, listennings, pic_serial):
         self.name = name
         self.picture_path = picture_path
+        self.pic_serial = pic_serial
         self.likes = likes
         self.listennings = listennings
 
@@ -31,15 +33,18 @@ SIGN_UP_LABEL_AFTER_FAIL = 'User already exists. Please try another email or use
 PROFILE_PIC_PATH = ''
 SONG_RECOMMENDATION_COUNT = 8
 SONG_RECOMMENDATION_PROMPT = '^Song_Recommendations'
-ALBUM_RECOMMENDATIONS_PROMPT = '^Album_Recommendations'
+ALBUM_RECOMMENDATIONS_PROMPT = '^Playlist_Recommendations'
 SEARCH = lambda prompt: f'Search?prompt={prompt}@'
 FETCH_RECORD = lambda record: f'Fetch/{record}@'
+SEARCH_PLAYLIST_TRACKS = lambda playlist: f'Fetch/^tracks:{playlist}@'
 SEARCH_RESPONSE_PREFIX = 'Searched'
 FETCH_RECORD_RESPONSE_PREFIX = 'Fetched'
 RECORD_PIC_PATH = lambda identifier: f"record_pictures/{identifier}"
 HOME_RECOMMENDATION_IDENTIFIER = lambda n: f"home_pic#{n}.jpg"
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
+
+RecordType = Enum('RecordType', ['song', 'playlist'])
 
 
 class Ui_MainWindow(object):
@@ -361,26 +366,6 @@ class Ui_MainWindow(object):
         self.horizontalLayout_28.setObjectName(u"horizontalLayout_28")
         self.verticalLayout_28 = QVBoxLayout()
         self.verticalLayout_28.setObjectName(u"verticalLayout_28")
-        self.playlist_song = QHBoxLayout()
-        self.playlist_song.setObjectName(u"playlist_song")
-        self.pushButton = QPushButton(self.scrollAreaWidgetContents_4)
-        self.pushButton.setObjectName(u"pushButton")
-        self.sizePolicy2.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
-        self.pushButton.setSizePolicy(self.sizePolicy2)
-        self.pushButton.setMinimumSize(QSize(70, 70))
-        self.pushButton.setMaximumSize(QSize(70, 70))
-        self.pushButton.setIcon(icon)
-        self.pushButton.setIconSize(QSize(80, 80))
-
-        self.playlist_song.addWidget(self.pushButton)
-
-        self.label_9 = QLabel(self.scrollAreaWidgetContents_4)
-        self.label_9.setObjectName(u"label_9")
-
-        self.playlist_song.addWidget(self.label_9)
-
-
-        self.verticalLayout_28.addLayout(self.playlist_song)
 
 
         self.horizontalLayout_28.addLayout(self.verticalLayout_28)
@@ -754,8 +739,8 @@ class Ui_MainWindow(object):
         self.song1.setText(QCoreApplication.translate("MainWindow", u"Song1", None))
         self.playlist_picture_label.setText("")
         self.playlist_title_label.setText(QCoreApplication.translate("MainWindow", u"Playlist Title", None))
-        self.pushButton.setText("")
-        self.label_9.setText(QCoreApplication.translate("MainWindow", u"Song1", None))
+        #self.pushButton.setText("")
+        #self.label_9.setText(QCoreApplication.translate("MainWindow", u"Song1", None))
         self.profile_my_profile_label.setText(QCoreApplication.translate("MainWindow", u"My Profile:", None))
         self.profile_picture_label.setText("")
         self.profile_username_label.setText(QCoreApplication.translate("MainWindow", u"Username", None))
@@ -797,28 +782,45 @@ class Ui_MainWindow(object):
         self.pushButton_8.clicked.connect(self.go_to_playlist)
         self.log_out_button.clicked.connect(self.log_out)
 
+        self.pic_serials = set()
+        self.max_pic_serial = 0
+
         self.recommendation_songs = self.search(SONG_RECOMMENDATION_PROMPT)
-        #self.recommenation_albums = self.search(SEARCH(ALBUM_RECOMMENDATIONS_PROMPT))
+        self.recommenation_albums = self.search(ALBUM_RECOMMENDATIONS_PROMPT)
         self.widgets = []
         for song in self.recommendation_songs:
-            self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5))
-        #for album in self.recommenation_albums:
-        #    self.widgets.append(self.add_record_to_homepage(album, self.homepage_album))
-
-
+            self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5, RecordType.song))
+        for album in self.recommenation_albums:
+            self.widgets.append(self.add_record_to_homepage(album, self.horizontalLayout_6, RecordType.playlist))
 
 
     # retranslateUi
 
 
+    def get_next_pic_serial(self):
+        if len(self.pic_serials) != 0:
+            return self.pic_serials.pop()
+        temp = self.max_pic_serial
+        self.max_pic_serial += 1
+        return temp
+
+
     def search(self, prompt):
-        self.send_queue.put(SEARCH(prompt))
+        return self.internal_search(SEARCH(prompt))
+
+
+    def get_playlist_tracks(self, playlist):
+        return self.internal_search(SEARCH_PLAYLIST_TRACKS(playlist))
+
+
+    def internal_search(self, req):
+        self.send_queue.put(req)
         record_names = self.process_search_response(self.gui_msg_queue.get().decode())
         records_left = len(record_names)
         records = [None for i in range(len(record_names))]
         while records_left > 0:
             curr_msg = self.gui_msg_queue.get()
-            curr_record = self.process_fetch_response(curr_msg, records_left)
+            curr_record = self.process_fetch_response(curr_msg, self.get_next_pic_serial())
             records[record_names.index(curr_record.name)] = curr_record
             records_left -= 1
         return records
@@ -838,7 +840,7 @@ class Ui_MainWindow(object):
         picture_path = RECORD_PIC_PATH(HOME_RECOMMENDATION_IDENTIFIER(serial))
         with open(picture_path, 'wb') as pic:
             pic.write(picture_data)
-        return Record(name.decode(), picture_path, int(likes.decode()), int(listennings.decode()))
+        return Record(name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial)
 
 
     def pause_or_play(self):
@@ -987,10 +989,6 @@ class Ui_MainWindow(object):
             self.HomePageRightStackeddWidget.setCurrentWidget(right_side)
 
 
-    def add_album_to_homepage(self):
-        pass
-
-
     def request_song(self, song):
         self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.name)
         self.send_queue.put(SEND_FOR_SONGS(song.name))
@@ -1002,10 +1000,19 @@ class Ui_MainWindow(object):
         self.player_track_listenings.setText('listennings: ' + str(song.listennings))
 
 
-    def add_record_to_homepage(self, record, main_layout):
+    def request_playlist(self, playlist):
+        tracks = self.get_playlist_tracks(playlist.name)
+        for track in tracks:
+            self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
+        self.playlist_tracks = tracks
+        self.go_to_playlist()
+
+
+    def add_record_to_homepage(self, record, main_layout, record_type):
         name, picture_path, likes, listennings = record.name, record.picture_path, record.likes, record.listennings
         layout = QVBoxLayout()
         layout.setObjectName(str.format(u"homepage_song_ser_{}", self.serial))
+        self.serial += 1
 
         #preparing button
         button = QPushButton(self.scrollAreaWidgetContents_2)
@@ -1014,7 +1021,10 @@ class Ui_MainWindow(object):
         button.setSizePolicy(self.sizePolicy2)
         button.setMinimumSize(QSize(70, 70))
         button.setMaximumSize(QSize(70, 70))
-        button.clicked.connect(lambda: self.request_song(record))
+        if record_type == RecordType.song:  # record is a song
+            button.clicked.connect(lambda: self.request_song(record))
+        else:  # record is a playlist
+            button.clicked.connect(lambda: self.request_playlist(record))
 
         #song picture
         icon = QIcon()
@@ -1039,6 +1049,44 @@ class Ui_MainWindow(object):
         widgets = [layout, button, label]
 
         return widgets
+
+
+    def add_record_to_playlist(self, record, main_layout):
+        name, picture_path = record.name, record.picture_path
+
+        #set up layout
+        layout = QHBoxLayout()
+        layout.setObjectName(u"playlist_track_ser{}".format(self.serial))
+        self.serial += 1
+
+        #set up picture
+        icon = QIcon()
+        icon.addFile(picture_path)
+
+        #set up button
+        button = QPushButton(self.scrollAreaWidgetContents_4)
+        button.setObjectName(name)
+        #self.sizePolicy2.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
+        button.setSizePolicy(self.sizePolicy2)
+        button.setMinimumSize(QSize(70, 70))
+        button.setMaximumSize(QSize(70, 70))
+        button.setIcon(icon)
+        button.setIconSize(QSize(80, 80))
+        button.clicked.connect(lambda: self.request_song(record))
+
+        layout.addWidget(button)
+
+        label = QLabel(self.scrollAreaWidgetContents_4)
+        label.setObjectName(name)
+        label.setText(name)
+
+        layout.addWidget(label)
+
+        main_layout.addLayout(layout)
+
+        widgets = [layout, button, label]
+        return widgets
+
 
 
     def clear_homepage(self):
