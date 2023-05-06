@@ -14,13 +14,18 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from enum import Enum
 
+
+RecordType = Enum('RecordType', ['song', 'playlist'])
+
+
 class Record:
-    def __init__(self, name, picture_path, likes, listennings, pic_serial):
+    def __init__(self, name, picture_path, likes, listennings, pic_serial, type):
         self.name = name
         self.picture_path = picture_path
         self.pic_serial = pic_serial
         self.likes = likes
         self.listennings = listennings
+        self.type = type
 
 
 SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1'
@@ -43,10 +48,9 @@ RECORD_PIC_PATH = lambda identifier: f"record_pictures/{identifier}"
 HOME_RECOMMENDATION_IDENTIFIER = lambda n: f"home_pic#{n}.jpg"
 REQUEST_PROFILE_PICTURE = 'Gui/Get_Profile_Picture@'
 PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
+STRING_TO_TYPE = {b'Song': RecordType.song, b'Playlist': RecordType.playlist}
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
-
-RecordType = Enum('RecordType', ['song', 'playlist'])
 
 
 class Ui_MainWindow(object):
@@ -791,9 +795,9 @@ class Ui_MainWindow(object):
         self.recommenation_albums = self.search(ALBUM_RECOMMENDATIONS_PROMPT)
         self.widgets = []
         for song in self.recommendation_songs:
-            self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5, RecordType.song))
+            self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5))
         for album in self.recommenation_albums:
-            self.widgets.append(self.add_record_to_homepage(album, self.horizontalLayout_6, RecordType.playlist))
+            self.widgets.append(self.add_record_to_homepage(album, self.horizontalLayout_6))
 
 
     # retranslateUi
@@ -843,13 +847,14 @@ class Ui_MainWindow(object):
 
     def process_fetch_response(self, msg, serial):
         split_msg = b''.join(msg.split(b'/')[2:]).split(b'&')
-        first_three_fields = split_msg[:3]
-        name, likes, listennings = [field.split(b'=')[1] for field in first_three_fields]
+        first_four_fields = split_msg[:4]
+        name, likes, listennings, type_string = [field.split(b'=')[1] for field in first_four_fields]
+        type = STRING_TO_TYPE[type_string]
         picture_data = msg[msg.find(b'&picture=') + len(b'&picture='):]
         picture_path = RECORD_PIC_PATH(HOME_RECOMMENDATION_IDENTIFIER(serial))
         with open(picture_path, 'wb') as pic:
             pic.write(picture_data)
-        return Record(name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial)
+        return Record(name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial, type)
 
 
     def pause_or_play(self):
@@ -1010,6 +1015,7 @@ class Ui_MainWindow(object):
 
 
     def request_playlist(self, playlist):
+        self.empty_playlist()
         tracks = self.get_playlist_tracks(playlist.name)
         for track in tracks:
             self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
@@ -1017,8 +1023,12 @@ class Ui_MainWindow(object):
         self.go_to_playlist()
 
 
-    def add_record_to_homepage(self, record, main_layout, record_type):
-        name, picture_path, likes, listennings = record.name, record.picture_path, record.likes, record.listennings
+    def empty_playlist(self):
+        empty_layout(self.verticalLayout_28)
+
+
+    def add_record_to_homepage(self, record, main_layout):
+        name, picture_path, likes, listennings, record_type = record.name, record.picture_path, record.likes, record.listennings, record.type
         layout = QVBoxLayout()
         layout.setObjectName(str.format(u"homepage_song_ser_{}", self.serial))
         self.serial += 1
@@ -1177,3 +1187,11 @@ class Ui_MainWindow(object):
         self.go_to_page(1, 2)
         self.MainWindow.show()
         sys.exit(self.app.exec())
+
+
+def  empty_layout(layout):
+    for i in reversed(range(layout.count())):
+        item = layout.takeAt(i)
+        layout.removeItem(item)
+        if item.widget():
+            item.widget().deleteLater()
