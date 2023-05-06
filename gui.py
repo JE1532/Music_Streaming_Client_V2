@@ -30,7 +30,7 @@ SIGN_IN_LABEL = 'Please enter your username and password.'
 SIGN_UP_LABEL = 'Please enter your username, password and email.'
 SIGN_IN_LABEL_AFTER_FAIL = 'Wrong username or password. Please enter credentials again.'
 SIGN_UP_LABEL_AFTER_FAIL = 'User already exists. Please try another email or username.'
-PROFILE_PIC_PATH = ''
+PROFILE_PIC_PATH = 'profile_pic.jpg'
 SONG_RECOMMENDATION_COUNT = 8
 SONG_RECOMMENDATION_PROMPT = '^Song_Recommendations'
 ALBUM_RECOMMENDATIONS_PROMPT = '^Playlist_Recommendations'
@@ -41,6 +41,8 @@ SEARCH_RESPONSE_PREFIX = 'Searched'
 FETCH_RECORD_RESPONSE_PREFIX = 'Fetched'
 RECORD_PIC_PATH = lambda identifier: f"record_pictures/{identifier}"
 HOME_RECOMMENDATION_IDENTIFIER = lambda n: f"home_pic#{n}.jpg"
+REQUEST_PROFILE_PICTURE = 'Gui/Get_Profile_Picture@'
+PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
 
@@ -96,8 +98,8 @@ class Ui_MainWindow(object):
         self.sizePolicy1.setVerticalStretch(0)
         self.sizePolicy1.setHeightForWidth(self.left_side_profile_pic_label.sizePolicy().hasHeightForWidth())
         self.left_side_profile_pic_label.setSizePolicy(self.sizePolicy1)
-        self.left_side_profile_pic_label.setMinimumSize(QSize(63, 0))
-        self.left_side_profile_pic_label.setMaximumSize(QSize(63, 50))
+        self.left_side_profile_pic_label.setMinimumSize(QSize(50, 50))
+        self.left_side_profile_pic_label.setMaximumSize(QSize(50, 50))
         self.left_side_profile_pic_label.setBaseSize(QSize(50, 50))
         self.left_side_profile_pic_label.setPixmap(QPixmap(u"../../Users/\u05d9\u05d4\u05d5\u05e0\u05ea\u05df \u05d0\u05dc\u05e4\u05e1\u05d9/Downloads/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png"))
         self.left_side_profile_pic_label.setScaledContents(True)
@@ -797,6 +799,13 @@ class Ui_MainWindow(object):
     # retranslateUi
 
 
+    def get_profile_pic(self):
+        self.send_queue.put(REQUEST_PROFILE_PICTURE)
+        response = self.gui_msg_queue.get()
+        with open(PROFILE_PIC_PATH, 'wb') as f:
+            f.write(response[len(PROFILE_PIC_RESPONSE_PREFIX):])
+        return
+
     def get_next_pic_serial(self):
         if len(self.pic_serials) != 0:
             return self.pic_serials.pop()
@@ -1123,6 +1132,11 @@ class Ui_MainWindow(object):
             self.main_go_to(self.AfterSignInPage)
             self.HomePageRightStackeddWidget.setCurrentWidget(self.HomeRightSide)
             self.left_side_username_label.setText(username)
+            self.get_profile_pic()
+            self.profile_pixmap = QPixmap(PROFILE_PIC_PATH)
+            self.left_side_profile_pic_label.setPixmap(self.profile_pixmap)
+            self.profile_picture_label.setPixmap(self.profile_pixmap)
+            self.profile_username_label.setText(username)
         return self.login_approved[0]
 
 
