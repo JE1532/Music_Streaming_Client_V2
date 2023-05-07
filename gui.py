@@ -305,27 +305,6 @@ class Ui_MainWindow(object):
         self.horizontalLayout_23.setObjectName(u"horizontalLayout_23")
         self.verticalLayout_30 = QVBoxLayout()
         self.verticalLayout_30.setObjectName(u"verticalLayout_30")
-        self.search_song = QHBoxLayout()
-        self.search_song.setObjectName(u"search_song")
-        self.pushButton_29 = QPushButton(self.scrollAreaWidgetContents_3)
-        self.pushButton_29.setObjectName(u"pushButton_29")
-        self.sizePolicy2.setHeightForWidth(self.pushButton_29.sizePolicy().hasHeightForWidth())
-        self.pushButton_29.setSizePolicy(self.sizePolicy2)
-        self.pushButton_29.setMinimumSize(QSize(70, 70))
-        self.pushButton_29.setMaximumSize(QSize(70, 70))
-        self.pushButton_29.setIcon(icon)
-        self.pushButton_29.setIconSize(QSize(80, 80))
-
-        self.search_song.addWidget(self.pushButton_29)
-
-        self.song1 = QLabel(self.scrollAreaWidgetContents_3)
-        self.song1.setObjectName(u"song1")
-
-        self.search_song.addWidget(self.song1)
-
-
-        self.verticalLayout_30.addLayout(self.search_song)
-
 
         self.horizontalLayout_23.addLayout(self.verticalLayout_30)
 
@@ -741,8 +720,6 @@ class Ui_MainWindow(object):
         self.pushButton_8.setText("")
         self.label_23.setText(QCoreApplication.translate("MainWindow", u"Greatest Hits", None))
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Songs", None))
-        self.pushButton_29.setText("")
-        self.song1.setText(QCoreApplication.translate("MainWindow", u"Song1", None))
         self.playlist_picture_label.setText("")
         self.playlist_title_label.setText(QCoreApplication.translate("MainWindow", u"Playlist Title", None))
         #self.pushButton.setText("")
@@ -784,7 +761,7 @@ class Ui_MainWindow(object):
         # linking left of main screen buttons to functions
         self.home_button.clicked.connect(self.go_to_home)
         self.profile_button.clicked.connect(self.go_to_profile)
-        self.SearchBarButton.clicked.connect(self.go_to_search)
+        self.SearchBarButton.clicked.connect(lambda: self.go_to_search(self.SearchBar.toPlainText()))
         self.pushButton_8.clicked.connect(self.go_to_playlist)
         self.log_out_button.clicked.connect(self.log_out)
 
@@ -1071,6 +1048,13 @@ class Ui_MainWindow(object):
 
 
     def add_record_to_playlist(self, record, main_layout):
+        self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_4)
+
+    def add_record_to_search_zone(self, record, main_layout):
+        self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_3)
+
+
+    def add_record_to_vertical_list(self, record, main_layout, parent):
         name, picture_path = record.name, record.picture_path
 
         #set up layout
@@ -1083,7 +1067,8 @@ class Ui_MainWindow(object):
         icon.addFile(picture_path)
 
         #set up button
-        button = QPushButton(self.scrollAreaWidgetContents_4)
+        #parent
+        button = QPushButton()
         button.setObjectName(name)
         #self.sizePolicy2.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
         button.setSizePolicy(self.sizePolicy2)
@@ -1091,11 +1076,15 @@ class Ui_MainWindow(object):
         button.setMaximumSize(QSize(70, 70))
         button.setIcon(icon)
         button.setIconSize(QSize(80, 80))
-        button.clicked.connect(lambda: self.request_song(record))
+        if record.type == RecordType.song:
+            button.clicked.connect(lambda: self.request_song(record))
+        elif record.type == RecordType.playlist:
+            button.clicked.connect(lambda: self.request_playlist(record))
 
         layout.addWidget(button)
 
-        label = QLabel(self.scrollAreaWidgetContents_4)
+        #parent
+        label = QLabel()
         label.setObjectName(name)
         label.setText(name)
 
@@ -1159,8 +1148,16 @@ class Ui_MainWindow(object):
     def go_to_home(self):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.HomeRightSide)
 
-    def go_to_search(self):
+    def go_to_search(self, prompt):
+        self.empty_search()
+        records = self.search(prompt)
+        for record in records:
+            self.add_record_to_search_zone(record, self.verticalLayout_30)
         self.HomePageRightStackeddWidget.setCurrentWidget(self.SearchRightSide)
+
+
+    def empty_search(self):
+        empty_layout(self.verticalLayout_30)
 
     def go_to_playlist(self):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.InsidePlaylistRightSide)
@@ -1189,9 +1186,11 @@ class Ui_MainWindow(object):
         sys.exit(self.app.exec())
 
 
-def  empty_layout(layout):
+def empty_layout(layout):
+    if layout.widget():
+        layout.widget().deleteLater()
+        return
     for i in reversed(range(layout.count())):
         item = layout.takeAt(i)
+        empty_layout(item)
         layout.removeItem(item)
-        if item.widget():
-            item.widget().deleteLater()
