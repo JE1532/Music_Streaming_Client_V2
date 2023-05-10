@@ -1,4 +1,5 @@
 import threading
+import ssl
 from queue import Queue
 import socket
 import multiprocessing
@@ -10,10 +11,12 @@ from stream_processor import stream_processor
 from stream_player import player
 from scrollbar_control import scrollbar_control, InfoEvent
 from gui import Ui_MainWindow as MainWindow
+from socket_wrapper import SocketWrapper
 
 
 
 SERVER = ('127.0.0.1', 9010)
+ROOTCA = 'rootCA.crt'
 
 
 def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_playing_event, player_fetching_event, scrollbar_paused_event):
@@ -35,11 +38,19 @@ def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock = ssl.wrap_socket(
+        sock,
+        ssl_version=ssl.PROTOCOL_TLSv1_2,
+        do_handshake_on_connect=True,
+        cert_reqs=ssl.CERT_REQUIRED,
+        ca_certs=ROOTCA
+    )
     sock.connect(SERVER)
+    sock = SocketWrapper(sock)
     print('connected!')
     threads = []
     rec_queue = Queue()
-    receiver = Receiver(lambda: sock.recv(200000), rec_queue)
+    receiver = Receiver(lambda: sock.recv(), rec_queue)
     receiver_thread = threading.Thread(target=receiver.start)
     threads.append(receiver_thread)
     stream_queue = multiprocessing.Queue()
