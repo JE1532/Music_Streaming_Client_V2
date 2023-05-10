@@ -997,6 +997,9 @@ class Ui_MainWindow(object):
         for track in tracks:
             self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
         self.playlist_tracks = tracks
+        self.playlist_picture_pixmap = QPixmap(playlist.picture_path)
+        self.playlist_picture_label.setPixmap(self.playlist_picture_pixmap)
+        self.playlist_title_label.setText(playlist.name)
         self.go_to_playlist()
 
 
