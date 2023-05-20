@@ -10,7 +10,7 @@ RATE = 44100
 CHUNK_SIZE = 1024
 
 
-def player(play_queue, playing_event, change_track_event):
+def player(play_queue, pause_event, play_event, change_track_event):
     p = pyaudio.PyAudio()
     output = p.open(format=8,
                     channels=2,
@@ -19,18 +19,18 @@ def player(play_queue, playing_event, change_track_event):
                     )
     while True:
         with wave.open(play_queue.get(), 'rb') as input:
-            play(input, output, playing_event, change_track_event)
+            play(input, output, pause_event, play_event, change_track_event)
             #print('another file')
 
 
-def play(input, output, playing_event, change_track_event):
+def play(input, output, pause_event, play_event, change_track_event):
     #print('start:', datetime.datetime.now())
     while len(data := input.readframes(CHUNK_SIZE)):
         output.write(data)
-        if playing_event.isSet():
-            playing_event.clear()
-            playing_event.wait()
-            playing_event.clear()
+        if pause_event.isSet():
+            pause_event.clear()
+            play_event.wait()
+            play_event.clear()
         if change_track_event.isSet():
             change_track_event.clear()
             break

@@ -20,13 +20,13 @@ SERVER = ('127.0.0.1', 9010)
 ROOTCA = 'rootCA.crt'
 
 
-def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_playing_event, player_fetching_event, scrollbar_paused_event):
+def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event):
     play_queue = Queue()
     player_change_track_event = threading.Event()
     stream_processor_thread = threading.Thread(target=stream_processor, args=(stream_queue, play_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, player_fetching_event, player_change_track_event))
     threads = []
     threads.append(stream_processor_thread)
-    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_playing_event, player_change_track_event))
+    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_pause_event, player_play_event, player_change_track_event))
     threads.append(stream_player_thread)
     scrollbar_control_thread = threading.Thread(target=scrollbar_control, args=(scrollbar_playing_event, gui, scrollbar_lock, scrollbar_paused_event))
     threads.append(scrollbar_control_thread)
@@ -70,14 +70,15 @@ def main():
     threads.append(user_processor_thread)
     expect_m3u8_and_url = [False, '']
     scrollbar_playing_event = InfoEvent()
-    player_playing_event = threading.Event()
+    player_pause_event = threading.Event()
+    player_play_event = threading.Event()
     player_fetching_event = InfoEvent()
     scrollbar_lock = threading.Lock()
     scrollbar_paused_event = threading.Event()
     gui = MainWindow()
-    gui_thread = threading.Thread(target=gui.start, args=(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_playing_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue))
+    gui_thread = threading.Thread(target=gui.start, args=(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue))
     gui_thread.start()
-    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_playing_event, player_fetching_event, scrollbar_paused_event))
+    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event))
     stream.start()
 
 

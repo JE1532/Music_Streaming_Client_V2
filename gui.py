@@ -54,7 +54,7 @@ PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
 
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_playing_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
+    def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(941, 582)
@@ -62,7 +62,9 @@ class Ui_MainWindow(object):
         self.scrollbar_paused_event = scrollbar_paused_event
         self.player_fetching_event = player_fetching_event  # change time in a song
         self.scrollbar_playing_event = scrollbar_playing_event
-        self.player_playing_event = player_playing_event
+        self.player_pause_event = player_pause_event
+        self.player_play_event = player_play_event
+        self.playing_paused = False
         self.expect_m3u8_and_url = expect_m3u8_and_url
         self.login_finished_event = login_finished_event
         self.login_approved = login_approved
@@ -806,8 +808,16 @@ class Ui_MainWindow(object):
 
 
     def pause_or_play(self):
+        self.playing_paused = not self.playing_paused
         self.scrollbar_playing_event.pause_or_play()
-        self.player_playing_event.set()
+        self.update_player(self.playing_paused)
+
+
+    def update_player(self, paused):
+        if not paused:
+            self.player_play_event.set()
+        else:
+            self.player_pause_event.set()
 
 
     def change_time(self):
@@ -816,6 +826,9 @@ class Ui_MainWindow(object):
         self.scrollbar_playing_event.set((track_length, val / 1000 * track_length))
         track_length, curr_time, is_new_song = self.player_fetching_event.info
         self.player_fetching_event.set((track_length, val / 1000 * track_length, False))
+        if self.playing_paused:
+            self.player_play_event.set()
+        self.playing_paused = False
 
 
     def holding_slider(self, val):
@@ -952,6 +965,9 @@ class Ui_MainWindow(object):
 
 
     def request_song(self, song):
+        if self.playing_paused:
+            self.player_play_event.set()
+        self.playing_paused = False
         self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.name)
         self.send_queue.put(SEND_FOR_SONGS(song.name))
         self.player_fetching_event.set((None, 0, True))
@@ -1151,10 +1167,10 @@ class Ui_MainWindow(object):
         self.player_scrollbar.setValue(1000 * val)
 
 
-    def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_playing_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
+    def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
         self.app = QApplication(sys.argv)
         self.MainWindow = QMainWindow()
-        self.setupUi(self.MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_playing_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue)
+        self.setupUi(self.MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue)
         self.go_to_page(1, 2)
         self.MainWindow.show()
         sys.exit(self.app.exec())
