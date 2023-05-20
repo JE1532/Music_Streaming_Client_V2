@@ -13,7 +13,7 @@ CHUNK_SIZE = 1024
 def player(play_queue, playing_event, change_track_event):
     p = pyaudio.PyAudio()
     output = p.open(format=8,
-                    channels=1,
+                    channels=2,
                     rate=RATE,
                     output=True,
                     )

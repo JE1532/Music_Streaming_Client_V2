@@ -228,31 +228,6 @@ class Ui_MainWindow(object):
         self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 595, 121))
         self.horizontalLayout_6 = QHBoxLayout(self.scrollAreaWidgetContents)
         self.horizontalLayout_6.setObjectName(u"horizontalLayout_6")
-        self.homepage_album = QVBoxLayout()
-        self.homepage_album.setObjectName(u"homepage_album")
-        self.homepage_album.setSizeConstraint(QLayout.SetMinimumSize)
-        self.pushButton_8 = QPushButton(self.scrollAreaWidgetContents)
-        self.pushButton_8.setObjectName(u"pushButton_8")
-        self.sizePolicy2.setHeightForWidth(self.pushButton_8.sizePolicy().hasHeightForWidth())
-        self.pushButton_8.setSizePolicy(self.sizePolicy2)
-        self.pushButton_8.setMinimumSize(QSize(70, 70))
-        self.pushButton_8.setMaximumSize(QSize(70, 70))
-        icon = QIcon()
-        icon.addFile(u"../../Users/\u05d9\u05d4\u05d5\u05e0\u05ea\u05df \u05d0\u05dc\u05e4\u05e1\u05d9/Downloads/264x264.jpg", QSize(), QIcon.Normal, QIcon.Off)
-        self.pushButton_8.setIcon(icon)
-        self.pushButton_8.setIconSize(QSize(80, 80))
-
-        self.homepage_album.addWidget(self.pushButton_8)
-
-        self.label_23 = QLabel(self.scrollAreaWidgetContents)
-        self.label_23.setObjectName(u"label_23")
-        self.sizePolicy2.setHeightForWidth(self.label_23.sizePolicy().hasHeightForWidth())
-        self.label_23.setSizePolicy(self.sizePolicy2)
-
-        self.homepage_album.addWidget(self.label_23)
-
-
-        self.horizontalLayout_6.addLayout(self.homepage_album)
 
         self.homepage_albums_scroll.setWidget(self.scrollAreaWidgetContents)
 
@@ -442,7 +417,6 @@ class Ui_MainWindow(object):
         self.pushButton_7.setSizePolicy(self.sizePolicy2)
         self.pushButton_7.setMinimumSize(QSize(70, 70))
         self.pushButton_7.setMaximumSize(QSize(70, 70))
-        self.pushButton_7.setIcon(icon)
         self.pushButton_7.setIconSize(QSize(80, 80))
 
         self.profile_song.addWidget(self.pushButton_7)
@@ -717,8 +691,6 @@ class Ui_MainWindow(object):
         self.SearchBar.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Search your favorites", None))
         self.SearchBarButton.setText(QCoreApplication.translate("MainWindow", u"Search", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Albums", None))
-        self.pushButton_8.setText("")
-        self.label_23.setText(QCoreApplication.translate("MainWindow", u"Greatest Hits", None))
         self.label_5.setText(QCoreApplication.translate("MainWindow", u"Songs", None))
         self.playlist_picture_label.setText("")
         self.playlist_title_label.setText(QCoreApplication.translate("MainWindow", u"Playlist Title", None))
@@ -762,7 +734,6 @@ class Ui_MainWindow(object):
         self.home_button.clicked.connect(self.go_to_home)
         self.profile_button.clicked.connect(self.go_to_profile)
         self.SearchBarButton.clicked.connect(lambda: self.go_to_search(self.SearchBar.toPlainText()))
-        self.pushButton_8.clicked.connect(self.go_to_playlist)
         self.log_out_button.clicked.connect(self.log_out)
 
         self.pic_serials = set()
