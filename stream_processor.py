@@ -16,6 +16,7 @@ TEMP_START_SEG = 'temp_start_file.wav'
 #CONVERTION_COMMAND = ['ffmpeg', '-y', '-f', 'mp4', '-read_ahead_limit', '-1', '-i', 'cache:pipe:0', '-acodec', 'pcm_s16le', '-vn', '-f', 'wav', '-']
 CONVERTION_COMMAND = ['ffmpeg', '-i', 'input.m4a', '-f', 'wav', '-']
 #p = subprocess.Popen(conversion_command, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+IGNORE = None
 
 
 def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event):
@@ -23,11 +24,12 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
     time_into_first_segment = 0
     while True:
         current_msg_encoded = input_queue.get()
-        separation_index = bytes.find(current_msg_encoded, b'\r\n\r\n')
-        assert separation_index != -1
-        headers = current_msg_encoded[:separation_index].decode()
-        body = current_msg_encoded[separation_index + 4:]
-        lines = headers.split('\n')
+        if not current_msg_encoded == IGNORE:
+            separation_index = bytes.find(current_msg_encoded, b'\r\n\r\n')
+            assert separation_index != -1
+            headers = current_msg_encoded[:separation_index].decode()
+            body = current_msg_encoded[separation_index + 4:]
+            lines = headers.split('\n')
         try:
             status_code = lines[0].split(' ')[1]
             if not status_code == '200':
@@ -41,7 +43,9 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             track_length, segment_times, segment_reqs = process_m3u8(body, dir, playlist)
             fetch_change_event.info = (track_length, 0, False)
             next_request, segment_num, is_first_seg = playlist.get()
-            send_queue.put(next_request)
+            #send_queue.put(next_request)
+            #print(next_request)
+            input_queue.put(IGNORE)
             expect_m3u8_and_url[0] = False
             downloaded_segments = dict()
             with scrollbar_lock:
@@ -56,6 +60,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment)
             if next_request:
                 send_queue.put(next_request)
+                print(next_request)
         else:
             segment = process_m4a(body, segment_num)
             downloaded_segments[segment_num] = segment
@@ -63,6 +68,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment)
             if next_request:
                 send_queue.put(next_request)
+                print(next_request)
             else:
                 print('done downloading')
                 while True:
@@ -77,6 +83,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
                     if next_request:
                         fetch_change_event.clear()
                         send_queue.put(next_request)
+                        print(next_request)
                         break
                     fetch_change_event.clear()
     print("terminating?")
