@@ -57,7 +57,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             time_into_first_segment = change_time(playlist, play_queue, segment_times, segment_reqs, new_time)
             fetch_change_event.clear()
             player_change_track_event.set()
-            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment)
+            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
             if next_request:
                 send_queue.put(next_request)
                 print(next_request)
@@ -65,7 +65,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             segment = process_m4a(body, segment_num)
             downloaded_segments[segment_num] = segment
             play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment))
-            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment)
+            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
             if next_request:
                 send_queue.put(next_request)
                 print(next_request)
@@ -79,7 +79,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
                     time_into_first_segment = change_time(playlist, play_queue, segment_times, segment_reqs, curr_time)
                     player_change_track_event.set()
                     fetch_change_event.clear()
-                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment)
+                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_track_event)
                     if next_request:
                         fetch_change_event.clear()
                         send_queue.put(next_request)
@@ -150,10 +150,13 @@ def handle_segment(segment, is_first_seg, time_into_first_segment):
     return segment
 
 
-def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment):
+def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event):
     next_request, segment_num, is_first_seg = None, None, None
     loop_broken = False
     while not playlist.empty():
+        if fetch_change_event.isSet():
+            loop_broken = True
+            break
         next_request, segment_num, is_first_seg = playlist.get()
         if not segment_num in downloaded_segments:
             loop_broken = True
