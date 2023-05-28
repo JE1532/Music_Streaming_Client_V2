@@ -32,11 +32,10 @@ class StreamReceiver(qtc.QObject):
 def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, play_next_song_signal):
     play_queue = Queue()
     player_change_track_event = threading.Event()
-    done_buffering = threading.Event()
-    stream_processor_thread = threading.Thread(target=stream_processor, args=(stream_queue, play_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, player_fetching_event, player_change_track_event, done_buffering))
+    stream_processor_thread = threading.Thread(target=stream_processor, args=(stream_queue, play_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, player_fetching_event, player_change_track_event))
     threads = []
     threads.append(stream_processor_thread)
-    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_pause_event, player_play_event, player_change_track_event, done_buffering))
+    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_pause_event, player_play_event, player_change_track_event, play_next_song_signal))
     threads.append(stream_player_thread)
     scrollbar_control_thread = threading.Thread(target=scrollbar_control, args=(scrollbar_playing_event, gui, scrollbar_lock, scrollbar_paused_event))
     threads.append(scrollbar_control_thread)
@@ -86,8 +85,9 @@ def main():
     scrollbar_lock = threading.Lock()
     scrollbar_paused_event = threading.Event()
     gui = MainWindow()
-    StreamReceiver.play_next_song_signal.connect(gui.play_next_song)
-    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, StreamReceiver.play_next_song_signal))
+    stream_rec = StreamReceiver(gui)
+    stream_rec.play_next_song_signal.connect(gui.play_next_song)
+    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, stream_rec.play_next_song_signal))
     stream.start()
 
 

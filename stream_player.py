@@ -9,8 +9,10 @@ FORMAT = pyaudio.paInt16
 RATE = 44100
 CHUNK_SIZE = 1024
 
+NEXT_SONG = 'next_song'
 
-def player(play_queue, pause_event, play_event, change_track_event):
+
+def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal):
     p = pyaudio.PyAudio()
     output = p.open(format=8,
                     channels=1,
@@ -22,6 +24,9 @@ def player(play_queue, pause_event, play_event, change_track_event):
         change_track_event.wait()
         change_track_event.clear()
         print(input_path)
+        if input_path == NEXT_SONG:
+            play_next_song_signal.emit()
+            continue
         with wave.open(input_path, 'rb') as input:
             play(input, output, pause_event, play_event, change_track_event)
             #print('another file')

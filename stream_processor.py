@@ -17,9 +17,10 @@ TEMP_START_SEG = 'temp_start_file.wav'
 CONVERTION_COMMAND = ['ffmpeg', '-i', 'input.m4a', '-f', 'wav', '-']
 #p = subprocess.Popen(conversion_command, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 IGNORE = None
+NEXT_SONG = 'next_song'
 
 
-def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event, done_buffering):
+def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event):
     playlist = Queue()
     time_into_first_segment = 0
     while True:
@@ -72,6 +73,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             else:
                 print('done downloading')
                 while True:
+                    play_queue.put(NEXT_SONG)
                     fetch_change_event.wait()
                     track_length, curr_time, is_new_song = fetch_change_event.info
                     if is_new_song:
