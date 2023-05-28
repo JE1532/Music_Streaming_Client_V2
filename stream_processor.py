@@ -19,7 +19,7 @@ CONVERTION_COMMAND = ['ffmpeg', '-i', 'input.m4a', '-f', 'wav', '-']
 IGNORE = None
 
 
-def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event):
+def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event, done_buffering):
     playlist = Queue()
     time_into_first_segment = 0
     while True:
@@ -79,7 +79,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
                     time_into_first_segment = change_time(playlist, play_queue, segment_times, segment_reqs, curr_time)
                     player_change_track_event.set()
                     fetch_change_event.clear()
-                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_track_event)
+                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
                     if next_request:
                         fetch_change_event.clear()
                         send_queue.put(next_request)

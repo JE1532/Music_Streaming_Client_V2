@@ -3,6 +3,7 @@ import ssl
 from queue import Queue
 import socket
 import multiprocessing
+from PySide6 import QtCore as qtc
 
 from receiver import Receiver
 from general_processor import GeneralProcessor
@@ -20,13 +21,22 @@ SERVER = ('127.0.0.1', 9010)
 ROOTCA = 'rootCA.crt'
 
 
-def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event):
+class StreamReceiver(qtc.QObject):
+    play_next_song_signal = qtc.Signal()
+
+    def __init__(self, gui):
+        super().__init__()
+        self.gui = gui
+
+
+def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, play_next_song_signal):
     play_queue = Queue()
     player_change_track_event = threading.Event()
-    stream_processor_thread = threading.Thread(target=stream_processor, args=(stream_queue, play_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, player_fetching_event, player_change_track_event))
+    done_buffering = threading.Event()
+    stream_processor_thread = threading.Thread(target=stream_processor, args=(stream_queue, play_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, player_fetching_event, player_change_track_event, done_buffering))
     threads = []
     threads.append(stream_processor_thread)
-    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_pause_event, player_play_event, player_change_track_event))
+    stream_player_thread = threading.Thread(target=player, args=(play_queue, player_pause_event, player_play_event, player_change_track_event, done_buffering))
     threads.append(stream_player_thread)
     scrollbar_control_thread = threading.Thread(target=scrollbar_control, args=(scrollbar_playing_event, gui, scrollbar_lock, scrollbar_paused_event))
     threads.append(scrollbar_control_thread)
@@ -76,14 +86,15 @@ def main():
     scrollbar_lock = threading.Lock()
     scrollbar_paused_event = threading.Event()
     gui = MainWindow()
-    gui_thread = threading.Thread(target=gui.start, args=(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue))
-    gui_thread.start()
-    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event))
+    StreamReceiver.play_next_song_signal.connect(gui.play_next_song)
+    stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, StreamReceiver.play_next_song_signal))
     stream.start()
 
 
     for thread in threads:
         thread.start()
+
+    gui.start(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue)
 
     for thread in threads:
         thread.join()

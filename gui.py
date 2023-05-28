@@ -19,13 +19,16 @@ RecordType = Enum('RecordType', ['song', 'playlist'])
 
 
 class Record:
-    def __init__(self, name, picture_path, likes, listennings, pic_serial, type):
-        self.name = name
+    def __init__(self, internal_name, external_name, picture_path, likes, listennings, pic_serial, type):
+        self.internal_name = internal_name
+        self.external_name = external_name
         self.picture_path = picture_path
         self.pic_serial = pic_serial
         self.likes = likes
         self.listennings = listennings
         self.type = type
+        self.next = None
+        self.prev = None
 
 
 SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1'
@@ -69,6 +72,7 @@ class Ui_MainWindow(object):
         self.login_finished_event = login_finished_event
         self.login_approved = login_approved
         self.send_queue = send_queue
+        self.current_song = None
         self.homepage_songs = []
         self.playlist_songs = []
         self.search_songs = []
@@ -784,7 +788,7 @@ class Ui_MainWindow(object):
         while records_left > 0:
             curr_msg = self.gui_msg_queue.get()
             curr_record = self.process_fetch_response(curr_msg, self.get_next_pic_serial())
-            records[record_names.index(curr_record.name)] = curr_record
+            records[record_names.index(curr_record.internal_name)] = curr_record
             records_left -= 1
         return records
 
@@ -797,14 +801,14 @@ class Ui_MainWindow(object):
 
     def process_fetch_response(self, msg, serial):
         split_msg = b''.join(msg.split(b'/')[2:]).split(b'&')
-        first_four_fields = split_msg[:4]
-        name, likes, listennings, type_string = [field.split(b'=')[1] for field in first_four_fields]
+        first_five_fields = split_msg[:5]
+        internal_name, external_name, likes, listennings, type_string = [field.split(b'=')[1] for field in first_five_fields]
         type = STRING_TO_TYPE[type_string]
         picture_data = msg[msg.find(b'&picture=') + len(b'&picture='):]
         picture_path = RECORD_PIC_PATH(HOME_RECOMMENDATION_IDENTIFIER(serial))
         with open(picture_path, 'wb') as pic:
             pic.write(picture_data)
-        return Record(name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial, type)
+        return Record(internal_name.decode(), external_name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial, type)
 
 
     def pause_or_play(self):
@@ -908,6 +912,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.PrevTrack = QPushButton(self.AfterSignInPage)
         self.PrevTrack.setObjectName(u"PrevTrack")
+        self.PrevTrack.clicked.connect(self.play_prev_song)
 
         self.horizontalLayout_3.addWidget(self.PrevTrack)
 
@@ -919,6 +924,7 @@ class Ui_MainWindow(object):
 
         self.NextTrack = QPushButton(self.AfterSignInPage)
         self.NextTrack.setObjectName(u"NextTrack")
+        self.NextTrack.clicked.connect(self.play_next_song)
 
         self.horizontalLayout_3.addWidget(self.NextTrack)
 
@@ -965,37 +971,55 @@ class Ui_MainWindow(object):
 
 
     def request_song(self, song):
+        self.current_song = song
         if self.playing_paused:
             self.player_play_event.set()
         self.playing_paused = False
-        self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.name)
-        self.send_queue.put(SEND_FOR_SONGS(song.name))
+        self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.internal_name)
+        self.send_queue.put(SEND_FOR_SONGS(song.internal_name))
         self.player_fetching_event.set((None, 0, True))
         pixmap = QPixmap(song.picture_path)
         self.player_picture.setPixmap(pixmap)
-        self.player_track_name.setText(song.name)
+        self.player_track_name.setText(song.external_name)
         self.player_track_likes.setText('likes: ' + str(song.likes))
         self.player_track_listenings.setText('listennings: ' + str(song.listennings))
 
 
     def request_playlist(self, playlist):
         self.empty_playlist()
-        tracks = self.get_playlist_tracks(playlist.name)
+        tracks = self.get_playlist_tracks(playlist.internal_name)
         for track in tracks:
             self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
+        tracks[0].next = tracks[1]
+        tracks[len(tracks) - 1].prev = tracks[len(tracks) - 2]
+        for i in range(1, len(tracks) - 1):
+            tracks[i].next = tracks[i + 1]
+            tracks[i].prev = tracks[i - 1]
         self.playlist_tracks = tracks
         self.playlist_picture_pixmap = QPixmap(playlist.picture_path)
         self.playlist_picture_label.setPixmap(self.playlist_picture_pixmap)
-        self.playlist_title_label.setText(playlist.name)
+        self.playlist_title_label.setText(playlist.external_name)
         self.go_to_playlist()
 
 
     def empty_playlist(self):
         empty_layout(self.verticalLayout_28)
 
+    @Slot()
+    def play_next_song(self):
+        if (not self.current_song) or (not self.current_song.next):
+            return
+        self.request_song(self.current_song.next)
+
+
+    @Slot()
+    def play_prev_song(self):
+        if (not self.current_song) or (not self.current_song.prev):
+            return
+        self.request_song(self.current_song.prev)
 
     def add_record_to_homepage(self, record, main_layout):
-        name, picture_path, likes, listennings, record_type = record.name, record.picture_path, record.likes, record.listennings, record.type
+        name, picture_path, likes, listennings, record_type = record.external_name, record.picture_path, record.likes, record.listennings, record.type
         layout = QVBoxLayout()
         layout.setObjectName(str.format(u"homepage_song_ser_{}", self.serial))
         self.serial += 1
@@ -1045,7 +1069,7 @@ class Ui_MainWindow(object):
 
 
     def add_record_to_vertical_list(self, record, main_layout, parent):
-        name, picture_path = record.name, record.picture_path
+        name, picture_path = record.external_name, record.picture_path
 
         #set up layout
         layout = QHBoxLayout()
