@@ -13,6 +13,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from enum import Enum
+from os.path import basename
 
 
 RecordType = Enum('RecordType', ['song', 'playlist'])
@@ -29,6 +30,70 @@ class Record:
         self.type = type
         self.next = None
         self.prev = None
+
+
+class GuiComponents:
+    def __init__(self, delete, load_picture):
+        self.delete = delete
+        self.load_picture = load_picture
+
+
+class Playlist:
+    def __init__(self):
+        self.song_to_num = dict()
+        self.num_to_song = dict()
+        self.song_to_file = dict()
+        self.song_to_gui_components = dict()
+        self.size = 0
+
+
+    def iterator(self):
+        for i in range(1, self.size + 1):
+            curr = self.num_to_song[i]
+            yield self.song_to_file[curr], curr.external_name
+
+
+    def __iter__(self):
+        return self.iterator()
+
+    def set_picture(self, pic_path):
+        for gui_components in self.song_to_gui_components.values():
+            gui_components.load_picture(pic_path)
+
+
+    def append_song(self, song, filename, gui_components):
+        self.size += 1
+        self.num_to_song[self.size] = song
+        self.song_to_num[song] = self.size
+        self.song_to_file[song] = filename
+        self.song_to_gui_components[song] = gui_components
+
+
+    def remove_song(self, song):
+        num = self.song_to_num[song]
+        self.song_to_num.pop(song)
+        self.num_to_song.pop(num)
+        self.song_to_file.pop(song)
+        gui_representation = self.song_to_gui_components[song]
+        gui_representation.delete()
+        self.song_to_gui_components.pop(song)
+        for i in range(num + 1, self.size + 1):
+            curr_song = self.num_to_song[i]
+            self.num_to_song.pop(i)
+            self.song_to_num.pop(curr_song)
+            self.num_to_song[i - 1] = curr_song
+            self.song_to_num[curr_song] = i - 1
+        self.size -= 1
+
+
+    def clear(self):
+        for song in self.song_to_num:
+            self.song_to_gui_components[song].delete()
+        self.size = 0
+        self.song_to_num = dict()
+        self.song_to_gui_components = dict()
+        self.song_to_file = dict()
+        self.num_to_song = dict()
 
 
 SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1'
@@ -54,6 +119,15 @@ PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
 STRING_TO_TYPE = {b'Song': RecordType.song, b'Playlist': RecordType.playlist}
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
+
+UPLOAD_PLAYLIST_PIC = 'upload_playlist_pic.png'
+UPLOAD_PLAYLIST_REQUEST_PREFIX = lambda length: f'Gui/Upload_Playlist/LEN {length}*'.encode()
+UPLOAD_PLAYLIST_NAME_PREFIX = lambda name: f'external_name= LEN {len(name)}*{name}'.encode()
+UPLOAD_PLAYLIST_PIC_PREFIX = lambda length: f'pic= LEN {length}*'.encode()
+UPLOAD_PLAYLIST_DELIMITER = b'&'
+UPLOAD_PLAYLIST_SONG_PREFIX = lambda name, length: f'song_name= LEN {len(name)}*{name}{UPLOAD_PLAYLIST_DELIMITER.decode()}song_audio= LEN {length}*'.encode()
+PLAYLIST_UPLOAD_OK = b'Gui/Upload_Successful'
+PLAYLIST_UPLOAD_FAILED = b'Gui/Upload_Failed'
 
 
 class Ui_MainWindow(object):
@@ -141,6 +215,11 @@ class Ui_MainWindow(object):
         self.profile_button.setObjectName(u"profile_button")
 
         self.verticalLayout_3.addWidget(self.profile_button)
+
+        self.upload_page_go_to_button = QPushButton(self.AfterSignInPage)
+        self.upload_page_go_to_button.setObjectName(u"upload_page_go_to_button")
+
+        self.verticalLayout_3.addWidget(self.upload_page_go_to_button)
 
         self.log_out_button = QPushButton(self.AfterSignInPage)
         self.log_out_button.setObjectName(u"log_out_button")
@@ -271,6 +350,76 @@ class Ui_MainWindow(object):
         self.horizontalLayout_21.addWidget(self.scrollArea_3)
 
         self.HomePageRightStackeddWidget.addWidget(self.HomeRightSide)
+
+        self.upload_page_right_side = QWidget()
+        self.upload_page_right_side.setObjectName(u"upload_page_right_side")
+        self.horizontalLayout_29 = QHBoxLayout(self.upload_page_right_side)
+        self.horizontalLayout_29.setObjectName(u"horizontalLayout_29")
+        self.upload_page_main_vertical_layout = QVBoxLayout()
+        self.upload_page_main_vertical_layout.setObjectName(u"upload_page_main_vertical_layout")
+        self.upload_page_top_layout = QHBoxLayout()
+        self.upload_page_top_layout.setObjectName(u"upload_page_top_layout")
+        self.upload_picture_label = QLabel(self.upload_page_right_side)
+        self.upload_picture_label.setObjectName(u"upload_picture_label")
+
+
+        self.sizePolicy2.setHeightForWidth(self.upload_picture_label.sizePolicy().hasHeightForWidth())
+        self.upload_picture_label.setSizePolicy(self.sizePolicy2)
+        self.upload_picture_label.setMinimumSize(QSize(80, 80))
+        self.upload_picture_label.setMaximumSize(QSize(80, 80))
+
+        self.upload_page_top_layout.addWidget(self.upload_picture_label)
+
+        self.upload_page_choose_pic_button = QPushButton(self.upload_page_right_side)
+        self.upload_page_choose_pic_button.setObjectName(u"upload_page_choose_pic_button")
+
+        self.upload_page_top_layout.addWidget(self.upload_page_choose_pic_button)
+
+        self.upload_page_playlist_name = QPlainTextEdit(self.upload_page_right_side)
+        self.upload_page_playlist_name.setObjectName(u"upload_page_playlist_name")
+        self.sizePolicy2.setHeightForWidth(self.upload_page_playlist_name.sizePolicy().hasHeightForWidth())
+        self.upload_page_playlist_name.setSizePolicy(self.sizePolicy2)
+        self.upload_page_playlist_name.setMinimumSize(QSize(10, 30))
+        self.upload_page_playlist_name.setMaximumSize(QSize(16000, 30))
+
+        self.upload_page_top_layout.addWidget(self.upload_page_playlist_name)
+
+        self.upload_page_upload_button = QPushButton(self.upload_page_right_side)
+        self.upload_page_upload_button.setObjectName(u"upload_page_upload_button")
+
+        self.upload_page_top_layout.addWidget(self.upload_page_upload_button)
+
+        self.upload_page_add_song_button = QPushButton(self.upload_page_right_side)
+        self.upload_page_add_song_button.setObjectName(u"upload_page_add_song_button")
+
+        self.upload_page_top_layout.addWidget(self.upload_page_add_song_button)
+
+
+        self.upload_page_main_vertical_layout.addLayout(self.upload_page_top_layout)
+
+        self.upload_page_scroll_area = QScrollArea(self.upload_page_right_side)
+        self.upload_page_scroll_area.setObjectName(u"upload_page_scroll_area")
+        self.upload_page_scroll_area.setWidgetResizable(True)
+        self.upload_page_filler_scroll_layout = QWidget()
+        self.upload_page_filler_scroll_layout.setObjectName(u"upload_page_filler_scroll_layout")
+        self.upload_page_filler_scroll_layout.setGeometry(QRect(0, 0, 612, 179))
+        self.horizontalLayout_30 = QHBoxLayout(self.upload_page_filler_scroll_layout)
+        self.horizontalLayout_30.setObjectName(u"horizontalLayout_30")
+        self.upload_page_scrolllayout = QVBoxLayout()
+        self.upload_page_scrolllayout.setObjectName(u"upload_page_scrolllayout")
+
+
+        self.horizontalLayout_30.addLayout(self.upload_page_scrolllayout)
+
+        self.upload_page_scroll_area.setWidget(self.upload_page_filler_scroll_layout)
+
+        self.upload_page_main_vertical_layout.addWidget(self.upload_page_scroll_area)
+
+
+        self.horizontalLayout_29.addLayout(self.upload_page_main_vertical_layout)
+
+        self.HomePageRightStackeddWidget.addWidget(self.upload_page_right_side)
+
         self.SearchRightSide = QWidget()
         self.SearchRightSide.setObjectName(u"SearchRightSide")
         self.horizontalLayout_22 = QHBoxLayout(self.SearchRightSide)
@@ -693,6 +842,7 @@ class Ui_MainWindow(object):
         self.left_side_username_label.setText(QCoreApplication.translate("MainWindow", u"Username", None))
         self.home_button.setText(QCoreApplication.translate("MainWindow", u"Home", None))
         self.profile_button.setText(QCoreApplication.translate("MainWindow", u"Profile", None))
+        self.upload_page_go_to_button.setText(QCoreApplication.translate("MainWindow", u"Upload", None))
         self.log_out_button.setText(QCoreApplication.translate("MainWindow", u"Log Out", None))
         self.SearchBar.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Search your favorites", None))
         self.SearchBarButton.setText(QCoreApplication.translate("MainWindow", u"Search", None))
@@ -716,6 +866,11 @@ class Ui_MainWindow(object):
         self.PausePlay.setText(QCoreApplication.translate("MainWindow", u"Pause/Play", None))
         self.NextTrack.setText(QCoreApplication.translate("MainWindow", u"Next", None))
         self.LikeCurrentTrack.setText(QCoreApplication.translate("MainWindow", u"Like", None))
+        self.upload_picture_label.setText("")
+        self.upload_page_choose_pic_button.setText(QCoreApplication.translate("MainWindow", u"Choose Picture", None))
+        self.upload_page_playlist_name.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Playlist Name", None))
+        self.upload_page_upload_button.setText(QCoreApplication.translate("MainWindow", u"Upload Playlist", None))
+        self.upload_page_add_song_button.setText(QCoreApplication.translate("MainWindow", u"Add Song", None))
         self.sign_in_label.setText(QCoreApplication.translate("MainWindow", u"Please enter your username and password:", None))
         self.username_for_sign_in.setPlaceholderText(QCoreApplication.translate("MainWindow", u"MyUsername", None))
         self.password_for_sign_in.setPlaceholderText(QCoreApplication.translate("MainWindow", u"SecretPassword", None))
@@ -731,6 +886,10 @@ class Ui_MainWindow(object):
         self.SignUpButton.setText(QCoreApplication.translate("MainWindow", u"Create Account", None))
         self.SignInButton.clicked.connect(self.sign_in)
         self.SwitchToSignUpButton.clicked.connect(self.switch_to_sign_up)
+        self.upload_page_add_song_button.clicked.connect(self.add_song_to_upload_playlist)
+        self.upload_page_choose_pic_button.clicked.connect(self.change_upload_playlist_picture)
+        self.upload_page_upload_button.clicked.connect(self.upload_playlist)
+        self.upload_playlist = Playlist()
 
         # linking buttons in sign up window to functions
         self.SignUpButton.clicked.connect(self.sign_up)
@@ -741,6 +900,7 @@ class Ui_MainWindow(object):
         self.profile_button.clicked.connect(self.go_to_profile)
         self.SearchBarButton.clicked.connect(lambda: self.go_to_search(self.SearchBar.toPlainText()))
         self.log_out_button.clicked.connect(self.log_out)
+        self.upload_page_go_to_button.clicked.connect(self.go_to_upload_page)
 
         self.pic_serials = set()
         self.max_pic_serial = 0
@@ -758,7 +918,7 @@ class Ui_MainWindow(object):
 
 
     def get_profile_pic(self):
-        self.send_queue.put(REQUEST_PROFILE_PICTURE)
+        self.send_queue.put(REQUEST_PROFILE_PICTURE.encode())
         response = self.gui_msg_queue.get()
         with open(PROFILE_PIC_PATH, 'wb') as f:
             f.write(response[len(PROFILE_PIC_RESPONSE_PREFIX):])
@@ -781,7 +941,7 @@ class Ui_MainWindow(object):
 
 
     def internal_search(self, req):
-        self.send_queue.put(req)
+        self.send_queue.put(req.encode())
         record_names = self.process_search_response(self.gui_msg_queue.get().decode())
         records_left = len(record_names)
         records = [None for i in range(len(record_names))]
@@ -795,7 +955,7 @@ class Ui_MainWindow(object):
     def process_search_response(self, msg):
         record_names = [record.split('\r\n')[1] for record in msg.split('#')[1:]]
         for record in record_names:
-            self.send_queue.put(FETCH_RECORD(record))
+            self.send_queue.put(FETCH_RECORD(record).encode())
         return record_names
 
 
@@ -976,7 +1136,7 @@ class Ui_MainWindow(object):
             self.player_play_event.set()
         self.playing_paused = False
         self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.internal_name)
-        self.send_queue.put(SEND_FOR_SONGS(song.internal_name))
+        self.send_queue.put(SEND_FOR_SONGS(song.internal_name).encode())
         self.player_fetching_event.set((None, 0, True))
         pixmap = QPixmap(song.picture_path)
         self.player_picture.setPixmap(pixmap)
@@ -990,8 +1150,9 @@ class Ui_MainWindow(object):
         tracks = self.get_playlist_tracks(playlist.internal_name)
         for track in tracks:
             self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
-        tracks[0].next = tracks[1]
-        tracks[len(tracks) - 1].prev = tracks[len(tracks) - 2]
+        if len(tracks) > 1:
+            tracks[0].next = tracks[1]
+            tracks[len(tracks) - 1].prev = tracks[len(tracks) - 2]
         for i in range(1, len(tracks) - 1):
             tracks[i].next = tracks[i + 1]
             tracks[i].prev = tracks[i - 1]
@@ -1061,8 +1222,52 @@ class Ui_MainWindow(object):
         return widgets
 
 
+    def change_upload_playlist_picture(self):
+        pic_path, filter = QFileDialog.getOpenFileName(parent=self.MainWindow, caption='open picture', dir='.', filter='*.jpg')
+        if pic_path == '':
+            return
+        with open(pic_path, 'rb') as input:
+            with open(UPLOAD_PLAYLIST_PIC, 'wb') as output:
+                output.write(input.read())
+        self.upload_playlist.set_picture(UPLOAD_PLAYLIST_PIC)
+        pixmap = QPixmap(UPLOAD_PLAYLIST_PIC)
+        self.upload_picture_label.setScaledContents(True)
+        self.upload_picture_label.setPixmap(pixmap)
+
+
+    def add_song_to_upload_playlist(self):
+        filename, filter = QFileDialog.getOpenFileName(parent=self.MainWindow, caption='Open file', dir='.', filter='*.wav')
+        if not filename:
+            return
+        curr_song = Record(None, ''.join(basename(filename).split('.')[:-1]), UPLOAD_PLAYLIST_PIC, 0, 0, -1, None)
+        gui_components, delete_button = self.add_record_to_upload_playlist(curr_song)
+        self.upload_playlist.append_song(curr_song, filename, gui_components)
+        delete_button.clicked.connect(lambda: self.upload_playlist.remove_song(curr_song))
+
+
+    def add_record_to_upload_playlist(self, record):
+        widgets = self.add_record_to_vertical_list(record, self.upload_page_scrolllayout, None)
+        layout = widgets[0]
+
+        #adding delete button-
+        delete_button = QPushButton(self.upload_page_filler_scroll_layout)
+        delete_button.setObjectName(u"delete_button")
+        layout.addWidget(delete_button)
+        delete_button.setText(QCoreApplication.translate("MainWindow", u"delete", None))
+        delete_button.setSizePolicy(self.sizePolicy2)
+        widgets.append(delete_button)
+
+        delete = lambda: remove_from_layout(self.upload_page_scrolllayout, layout)
+        def set_gui_comp_pic(pic_path):
+            icon = QIcon()
+            icon.addFile(pic_path)
+            widgets[1].setIcon(icon)
+        gui_components = GuiComponents(delete, lambda pic_path: set_gui_comp_pic(pic_path))
+
+        return gui_components, delete_button
+
     def add_record_to_playlist(self, record, main_layout):
-        self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_4)
+        return self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_4)
 
     def add_record_to_search_zone(self, record, main_layout):
         self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_3)
@@ -1110,17 +1315,8 @@ class Ui_MainWindow(object):
         return widgets
 
 
-
-    def clear_homepage(self):
-        pass
-
-
-    def set_playlist_songs(self):
-        pass
-
-
     def sign_in(self):
-        self.send_queue.put(str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()))
+        self.send_queue.put(str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()).encode())
         successful = self.log_in(self.username_for_sign_in.text())
         self.username_for_sign_in.clear()
         self.password_for_sign_in.clear()
@@ -1128,7 +1324,7 @@ class Ui_MainWindow(object):
             self.sign_in_label.setText(SIGN_IN_LABEL_AFTER_FAIL)
 
     def sign_up(self):
-        self.send_queue.put(str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()))
+        self.send_queue.put(str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode())
         successful = self.log_in(self.username_for_sign_up.text())
         self.username_for_sign_up.clear()
         self.password_for_sign_up.clear()
@@ -1153,11 +1349,34 @@ class Ui_MainWindow(object):
         return self.login_approved[0]
 
 
+    def upload_playlist(self):
+        if self.upload_page_playlist_name.toPlainText() == '':
+            return
+        request = construct_upload_playlist_request(UPLOAD_PLAYLIST_PIC, self.upload_playlist, self.upload_page_playlist_name.toPlainText())
+        self.send_queue.put(request)
+        response = self.gui_msg_queue.get()
+        msg = QMessageBox()
+        if response == PLAYLIST_UPLOAD_OK:
+            msg.setWindowTitle('Upload Successful')
+            msg.setText('Upload Successful!')
+            self.upload_playlist.clear()
+            msg.exec_()
+        else:
+            msg.setWindowTitle('Upload Failed')
+            msg.setText('Upload failed, please try again...')
+            msg.exec()
+
+
+
     def switch_to_sign_in(self):
         self.SignInOrLogInStackedWidget.setCurrentWidget(self.SignIn)
 
     def switch_to_sign_up(self):
         self.SignInOrLogInStackedWidget.setCurrentWidget(self.SignUp)
+
+
+    def go_to_upload_page(self):
+        self.HomePageRightStackeddWidget.setCurrentWidget(self.upload_page_right_side)
 
     def go_to_home(self):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.HomeRightSide)
@@ -1208,3 +1427,27 @@ def empty_layout(layout):
         item = layout.takeAt(i)
         empty_layout(item)
         layout.removeItem(item)
+
+
+def remove_from_layout(parent_layout, child_layout):
+    empty_layout(child_layout)
+    parent_layout.removeItem(child_layout)
+
+
+def construct_upload_playlist_request(pic, playlist, playlist_name):
+    msg = bytearray()
+    msg.extend(UPLOAD_PLAYLIST_NAME_PREFIX(playlist_name))
+    msg.extend(UPLOAD_PLAYLIST_DELIMITER)
+    with open(pic, 'rb') as picf:
+        pic_data = picf.read()
+        msg.extend(UPLOAD_PLAYLIST_PIC_PREFIX(len(pic_data)))
+        msg.extend(pic_data)
+    for song_file, song in playlist:
+        msg.extend(UPLOAD_PLAYLIST_DELIMITER)
+        with open(song_file, 'rb') as sf:
+            song_data = sf.read()
+        msg.extend(UPLOAD_PLAYLIST_SONG_PREFIX(song, len(song_data)))
+        msg.extend(song_data)
+    request = bytearray(UPLOAD_PLAYLIST_REQUEST_PREFIX(len(msg)))
+    request.extend(msg)
+    return request

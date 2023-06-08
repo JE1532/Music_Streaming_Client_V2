@@ -7,7 +7,7 @@ import datetime
 
 FORMAT = pyaudio.paInt16
 RATE = 44100
-CHUNK_SIZE = 1024
+CHUNK_SIZE = 256
 
 NEXT_SONG = 'next_song'
 
@@ -23,7 +23,6 @@ def player(play_queue, pause_event, play_event, change_track_event, play_next_so
         input_path = play_queue.get()
         change_track_event.wait()
         change_track_event.clear()
-        print(input_path)
         if input_path == NEXT_SONG:
             play_next_song_signal.emit()
             continue

@@ -1,10 +1,8 @@
 from pydub import AudioSegment
-from io import BytesIO
 from queue import Queue
 from os.path import dirname
 import os
 import subprocess
-import time
 
 
 M3U8 = b'#EXTM3U'
@@ -60,7 +58,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             player_change_track_event.set()
             next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
             if next_request:
-                send_queue.put(next_request)
+                send_queue.put(next_request.encode())
                 print(next_request)
         else:
             segment = process_m4a(body, segment_num)
@@ -68,7 +66,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment))
             next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
             if next_request:
-                send_queue.put(next_request)
+                send_queue.put(next_request.encode())
                 print(next_request)
             else:
                 print('done downloading')
@@ -84,7 +82,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
                     next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
                     if next_request:
                         fetch_change_event.clear()
-                        send_queue.put(next_request)
+                        send_queue.put(next_request.encode())
                         print(next_request)
                         break
                     fetch_change_event.clear()
