@@ -9,6 +9,7 @@
 ################################################################################
 
 import sys
+import os
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
@@ -96,6 +97,13 @@ class Playlist:
         self.num_to_song = dict()
 
 
+def get_finisher(release_functions):
+    def finisher():
+        for release in release_functions:
+            release()
+    return finisher
+
+
 SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1'
 SIGN_UP = 'UserProcessor/SignUp?username={}&password={}&email={}@'
 SIGN_IN = 'UserProcessor/SignIn?username={}&password={}@'
@@ -153,6 +161,8 @@ class Ui_MainWindow(object):
         self.profile_songs = []
         self.serial = 0
         self.username = None
+        self.search_releasers = []
+        self.playlist_releasers = []
         self.sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.sizePolicy.setHorizontalStretch(0)
         self.sizePolicy.setVerticalStretch(0)
@@ -1164,7 +1174,10 @@ class Ui_MainWindow(object):
 
 
     def empty_playlist(self):
-        empty_layout(self.verticalLayout_28)
+        self.playlist_releasers.append(lambda: empty_layout(self.verticalLayout_28))
+        finisher = get_finisher(self.playlist_releasers)
+        finisher()
+        self.playlist_releasers = []
 
     @Slot()
     def play_next_song(self):
@@ -1257,7 +1270,7 @@ class Ui_MainWindow(object):
         delete_button.setSizePolicy(self.sizePolicy2)
         widgets.append(delete_button)
 
-        delete = lambda: remove_from_layout(self.upload_page_scrolllayout, layout)
+        delete = get_finisher([lambda: remove_from_layout(self.upload_page_scrolllayout, layout)])
         def set_gui_comp_pic(pic_path):
             icon = QIcon()
             icon.addFile(pic_path)
@@ -1266,10 +1279,14 @@ class Ui_MainWindow(object):
 
         return gui_components, delete_button
 
-    def add_record_to_playlist(self, record, main_layout):
+    def add_record_to_playlist(self, record, main_layout, release_picture=True):
+        if release_picture:
+            self.playlist_releasers.append(self.get_release_for_picture(record.pic_serial, record.picture_path))
         return self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_4)
 
-    def add_record_to_search_zone(self, record, main_layout):
+    def add_record_to_search_zone(self, record, main_layout, release_picture=True):
+        if release_picture:
+            self.search_releasers.append(self.get_release_for_picture(record.pic_serial, record.picture_path))
         self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_3)
 
 
@@ -1390,7 +1407,10 @@ class Ui_MainWindow(object):
 
 
     def empty_search(self):
-        empty_layout(self.verticalLayout_30)
+        self.search_releasers.append(lambda: empty_layout(self.verticalLayout_30))
+        finisher = get_finisher(self.search_releasers)
+        finisher()
+        self.search_releasers = []
 
     def go_to_playlist(self):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.InsidePlaylistRightSide)
@@ -1409,6 +1429,12 @@ class Ui_MainWindow(object):
     def set_scrollbar_value(self, val):
         self.player_scrollbar.setValue(1000 * val)
 
+
+    def get_release_for_picture(self, pic_serial, pic_path):
+        def release_picture():
+            os.remove(pic_path)
+            self.pic_serials.add(pic_serial)
+        return release_picture
 
     def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
         self.app = QApplication(sys.argv)
