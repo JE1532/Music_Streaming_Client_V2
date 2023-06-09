@@ -127,7 +127,7 @@ PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
 STRING_TO_TYPE = {b'Song': RecordType.song, b'Playlist': RecordType.playlist}
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
-
+DEFAULT_UPLOAD_PLAYLIST_PIC = 'default_upload_playlist_pic.jpg'
 UPLOAD_PLAYLIST_PIC = 'upload_playlist_pic.png'
 UPLOAD_PLAYLIST_REQUEST_PREFIX = lambda length: f'Gui/Upload_Playlist/LEN {length}*'.encode()
 UPLOAD_PLAYLIST_NAME_PREFIX = lambda name: f'external_name= LEN {len(name)}*{name}'.encode()
@@ -912,6 +912,9 @@ class Ui_MainWindow(object):
         self.log_out_button.clicked.connect(self.log_out)
         self.upload_page_go_to_button.clicked.connect(self.go_to_upload_page)
 
+        # loading default picture into upload playlist
+        self.change_upload_playlist_picture(default=True)
+
         self.pic_serials = set()
         self.max_pic_serial = 0
 
@@ -1235,8 +1238,11 @@ class Ui_MainWindow(object):
         return widgets
 
 
-    def change_upload_playlist_picture(self):
-        pic_path, filter = QFileDialog.getOpenFileName(parent=self.MainWindow, caption='open picture', dir='.', filter='*.jpg')
+    def change_upload_playlist_picture(self, default=False):
+        if default:
+            pic_path = DEFAULT_UPLOAD_PLAYLIST_PIC
+        else:
+            pic_path, filter = QFileDialog.getOpenFileName(parent=self.MainWindow, caption='open picture', dir='.', filter='*.jpg')
         if pic_path == '':
             return
         with open(pic_path, 'rb') as input:
@@ -1376,7 +1382,9 @@ class Ui_MainWindow(object):
         if response == PLAYLIST_UPLOAD_OK:
             msg.setWindowTitle('Upload Successful')
             msg.setText('Upload Successful!')
-            self.upload_playlist.clear()
+            upload_playlist_releasers = [self.upload_playlist.clear, lambda: self.change_upload_playlist_picture(default=True), lambda: self.upload_page_playlist_name.clear()]
+            finisher = get_finisher(upload_playlist_releasers)
+            finisher()
             msg.exec_()
         else:
             msg.setWindowTitle('Upload Failed')
