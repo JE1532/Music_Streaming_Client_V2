@@ -13,7 +13,7 @@ REQ = lambda dir, relative_path: f"""GET /{dir + '/' + relative_path} HTTP/1.1@"
 SEGMENT = lambda serial: f'segment{serial}.wav'
 TEMP_START_SEG = 'temp_start_file.wav'
 #CONVERTION_COMMAND = ['ffmpeg', '-y', '-f', 'mp4', '-read_ahead_limit', '-1', '-i', 'cache:pipe:0', '-acodec', 'pcm_s16le', '-vn', '-f', 'wav', '-']
-CONVERTION_COMMAND = ['ffmpeg', '-i', 'input.m4a', '-f', 'wav', '-']
+CONVERTION_COMMAND = ['ffmpeg', '-f', 'mpegts', '-i', 'input.m4a', '-f', 'wav', '-']
 #p = subprocess.Popen(conversion_command, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 IGNORE = None
 NEXT_SONG = 'next_song'

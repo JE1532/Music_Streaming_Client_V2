@@ -67,7 +67,8 @@ def main():
     stream_queue = multiprocessing.Queue()
     user_replies_queue = Queue()
     gui_msg_queue = Queue()
-    general_processor = GeneralProcessor(rec_queue, stream_queue, user_replies_queue, gui_msg_queue)
+    upload_resp_queue = Queue()
+    general_processor = GeneralProcessor(rec_queue, stream_queue, user_replies_queue, gui_msg_queue, upload_resp_queue)
     general_processor_thread = threading.Thread(target=general_processor.start)
     threads.append(general_processor_thread)
     send_queue = Queue()
@@ -95,7 +96,7 @@ def main():
     for thread in threads:
         thread.start()
 
-    gui.start(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue)
+    gui.start(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue)
 
     for thread in threads:
         thread.join()

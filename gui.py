@@ -134,16 +134,17 @@ UPLOAD_PLAYLIST_NAME_PREFIX = lambda name: f'external_name= LEN {len(name)}*{nam
 UPLOAD_PLAYLIST_PIC_PREFIX = lambda length: f'pic= LEN {length}*'.encode()
 UPLOAD_PLAYLIST_DELIMITER = b'&'
 UPLOAD_PLAYLIST_SONG_PREFIX = lambda name, length: f'song_name= LEN {len(name)}*{name}{UPLOAD_PLAYLIST_DELIMITER.decode()}song_audio= LEN {length}*'.encode()
-PLAYLIST_UPLOAD_OK = b'Gui/Upload_Successful'
-PLAYLIST_UPLOAD_FAILED = b'Gui/Upload_Failed'
+PLAYLIST_UPLOAD_OK = b'Upload_Resp/Upload_Successful'
+PLAYLIST_UPLOAD_FAILED = b'Upload_Resp/Upload_Failed'
 
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
+    def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(941, 582)
         self.gui_msg_queue = gui_msg_queue
+        self.upload_resp_queue = upload_resp_queue
         self.scrollbar_paused_event = scrollbar_paused_event
         self.player_fetching_event = player_fetching_event  # change time in a song
         self.scrollbar_playing_event = scrollbar_playing_event
@@ -380,29 +381,50 @@ class Ui_MainWindow(object):
 
         self.upload_page_top_layout.addWidget(self.upload_picture_label)
 
+
+        #uplaod page stacked widget for during and before download displayes
+        sizePolicyForUploadPageStackedidget = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        sizePolicyForUploadPageStackedidget.setHorizontalStretch(0)
+        sizePolicyForUploadPageStackedidget.setVerticalStretch(0)
+
+
+        self.upload_page_upload_stacked_widget = QStackedWidget(self.AfterSignInPage)
+        self.upload_page_upload_stacked_widget.setObjectName(u"upload_page_upload_stacked_widget")
+        sizePolicyForUploadPageStackedidget.setHeightForWidth(self.upload_page_upload_stacked_widget.sizePolicy().hasHeightForWidth())
+        self.upload_page_upload_stacked_widget.setSizePolicy(sizePolicyForUploadPageStackedidget)
+        self.upload_page_upload_stacked_widget.setMinimumSize(QSize(0, 50))
+        self.upload_page_upload_stacked_widget.setMaximumSize(QSize(16777215, 50))
+        self.upload_page_before_upload = QWidget()
+        self.upload_page_before_upload.setObjectName(u"upload_page_before_upload")
+        self.horizontalLayout_60 = QHBoxLayout(self.upload_page_before_upload)
         self.upload_page_choose_pic_button = QPushButton(self.upload_page_right_side)
         self.upload_page_choose_pic_button.setObjectName(u"upload_page_choose_pic_button")
-
-        self.upload_page_top_layout.addWidget(self.upload_page_choose_pic_button)
-
-        self.upload_page_playlist_name = QPlainTextEdit(self.upload_page_right_side)
+        self.horizontalLayout_60.addWidget(self.upload_page_choose_pic_button)
+        self.upload_page_playlist_name = QTextBrowser(self.upload_page_before_upload)
         self.upload_page_playlist_name.setObjectName(u"upload_page_playlist_name")
-        self.sizePolicy2.setHeightForWidth(self.upload_page_playlist_name.sizePolicy().hasHeightForWidth())
-        self.upload_page_playlist_name.setSizePolicy(self.sizePolicy2)
-        self.upload_page_playlist_name.setMinimumSize(QSize(10, 30))
-        self.upload_page_playlist_name.setMaximumSize(QSize(16000, 30))
-
-        self.upload_page_top_layout.addWidget(self.upload_page_playlist_name)
-
-        self.upload_page_upload_button = QPushButton(self.upload_page_right_side)
+        sizePolicyForUploadPageStackedidget.setHeightForWidth(self.upload_page_playlist_name.sizePolicy().hasHeightForWidth())
+        self.upload_page_playlist_name.setSizePolicy(sizePolicyForUploadPageStackedidget)
+        self.upload_page_playlist_name.setMinimumSize(QSize(0, 30))
+        self.upload_page_playlist_name.setMaximumSize(QSize(16777215, 30))
+        self.upload_page_playlist_name.setReadOnly(False)
+        self.horizontalLayout_60.addWidget(self.upload_page_playlist_name)
+        self.upload_page_upload_button = QPushButton(self.upload_page_before_upload)
         self.upload_page_upload_button.setObjectName(u"upload_page_upload_button")
-
-        self.upload_page_top_layout.addWidget(self.upload_page_upload_button)
-
+        self.horizontalLayout_60.addWidget(self.upload_page_upload_button)
         self.upload_page_add_song_button = QPushButton(self.upload_page_right_side)
         self.upload_page_add_song_button.setObjectName(u"upload_page_add_song_button")
+        self.horizontalLayout_60.addWidget(self.upload_page_add_song_button)
+        self.upload_page_upload_stacked_widget.addWidget(self.upload_page_before_upload)
+        self.upload_page_during_upload = QWidget()
+        self.upload_page_during_upload.setObjectName(u"upload_page_during_upload")
+        self.horizontalLayout_61 = QHBoxLayout(self.upload_page_during_upload)
+        self.upload_page_please_wait_label = QLabel(self.upload_page_during_upload)
+        self.upload_page_please_wait_label.setObjectName(u"upload_page_please_wait_label")
+        self.horizontalLayout_61.addWidget(self.upload_page_please_wait_label)
+        self.upload_page_upload_stacked_widget.addWidget(self.upload_page_during_upload)
 
-        self.upload_page_top_layout.addWidget(self.upload_page_add_song_button)
+
+        self.upload_page_top_layout.addWidget(self.upload_page_upload_stacked_widget)
 
 
         self.upload_page_main_vertical_layout.addLayout(self.upload_page_top_layout)
@@ -879,7 +901,9 @@ class Ui_MainWindow(object):
         self.upload_picture_label.setText("")
         self.upload_page_choose_pic_button.setText(QCoreApplication.translate("MainWindow", u"Choose Picture", None))
         self.upload_page_playlist_name.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Playlist Name", None))
+        self.upload_page_upload_stacked_widget.setCurrentIndex(2)
         self.upload_page_upload_button.setText(QCoreApplication.translate("MainWindow", u"Upload Playlist", None))
+        self.upload_page_please_wait_label.setText(QCoreApplication.translate("MainWindow", u"Please wait, this may take a while...", None))
         self.upload_page_add_song_button.setText(QCoreApplication.translate("MainWindow", u"Add Song", None))
         self.sign_in_label.setText(QCoreApplication.translate("MainWindow", u"Please enter your username and password:", None))
         self.username_for_sign_in.setPlaceholderText(QCoreApplication.translate("MainWindow", u"MyUsername", None))
@@ -1377,12 +1401,18 @@ class Ui_MainWindow(object):
             return
         request = construct_upload_playlist_request(UPLOAD_PLAYLIST_PIC, self.upload_playlist, self.upload_page_playlist_name.toPlainText())
         self.send_queue.put(request)
-        response = self.gui_msg_queue.get()
+        self.process_upload_response()
+
+
+    def process_upload_response(self):
+        response = self.upload_resp_queue.get()
         msg = QMessageBox()
         if response == PLAYLIST_UPLOAD_OK:
             msg.setWindowTitle('Upload Successful')
             msg.setText('Upload Successful!')
-            upload_playlist_releasers = [self.upload_playlist.clear, lambda: self.change_upload_playlist_picture(default=True), lambda: self.upload_page_playlist_name.clear()]
+            upload_playlist_releasers = [self.upload_playlist.clear,
+                                         lambda: self.change_upload_playlist_picture(default=True),
+                                         lambda: self.upload_page_playlist_name.clear()]
             finisher = get_finisher(upload_playlist_releasers)
             finisher()
             msg.exec_()
@@ -1390,7 +1420,6 @@ class Ui_MainWindow(object):
             msg.setWindowTitle('Upload Failed')
             msg.setText('Upload failed, please try again...')
             msg.exec()
-
 
 
     def switch_to_sign_in(self):
@@ -1444,10 +1473,10 @@ class Ui_MainWindow(object):
             self.pic_serials.add(pic_serial)
         return release_picture
 
-    def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue):
+    def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
         self.app = QApplication(sys.argv)
         self.MainWindow = QMainWindow()
-        self.setupUi(self.MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue)
+        self.setupUi(self.MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue)
         self.go_to_page(1, 2)
         self.MainWindow.show()
         sys.exit(self.app.exec())

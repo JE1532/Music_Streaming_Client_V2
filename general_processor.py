@@ -1,14 +1,16 @@
 STREAM = 'HTTP'
 USER_REQUEST = 'UserProcessor'
 GUI = b'Gui'
+UPLOAD_RESP = b'Upload_Resp'
 
 
 class GeneralProcessor:
-    def __init__(self, input_pass_queue, stream_proc_queue, user_proc_queue, gui_msg_queue):
+    def __init__(self, input_pass_queue, stream_proc_queue, user_proc_queue, gui_msg_queue, upload_resp_queue):
         self.input_pass_queue = input_pass_queue
         self.stream_proc_queue = stream_proc_queue
         self.user_proc_queue = user_proc_queue
         self.gui_msg_queue = gui_msg_queue
+        self.upload_resp_queue = upload_resp_queue
 
 
     def start(self):
@@ -25,6 +27,10 @@ class GeneralProcessor:
         prefix = request[:len(GUI)]
         if prefix == GUI:
             self.gui_msg_queue.put(request)
+            return
+        prefix = request[:len(UPLOAD_RESP)]
+        if prefix == UPLOAD_RESP:
+            self.upload_resp_queue.put(request)
             return
         request_decoded = request.decode()
         prefix = request_decoded.split('/')[0]
