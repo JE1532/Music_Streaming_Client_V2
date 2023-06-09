@@ -3,6 +3,7 @@ from queue import Queue
 from os.path import dirname
 import os
 import subprocess
+import threading
 
 
 M3U8 = b'#EXTM3U'
@@ -18,9 +19,62 @@ IGNORE = None
 NEXT_SONG = 'next_song'
 
 
-def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event):
+class FileSystemWrapper:
+    def __init__(self, path_maker, segment_name):
+        self.path_maker = path_maker
+        self.segment_name = segment_name
+        self.segname_to_filename = dict()
+        self.available_filenames = set()
+        self.next_filenum = 0
+        self.lock = threading.Lock()
+
+
+    def save(self, segname, data):
+        self.lock.acquire()
+        if len(self.available_filenames) == 0:
+            filename = self.path_maker(self.next_filenum)
+            self.next_filenum += 1
+        else:
+            filename = self.available_filenames.pop()
+        self.segname_to_filename[segname] = filename
+        self.lock.release()
+        with open(filename, 'wb') as f:
+            f.write(data)
+
+
+    def clear(self, wait_for=None):
+        self.lock.acquire()
+        filenames_for_clearing = set(self.segname_to_filename.values())
+        self.segname_to_filename = dict()
+        self.lock.release()
+        releaser = threading.Thread(target=self.free_filenames, args=(filenames_for_clearing, wait_for))
+        releaser.start()
+
+
+    def free_filenames(self, filenames, wait_for):
+        if wait_for:
+            wait_for.wait()
+            wait_for.clear()
+        for filename in filenames:
+            self.free_filename(filename)
+
+
+    def free_filename(self, filename):
+        os.remove(filename)
+        self.lock.acquire()
+        self.available_filenames.add(filename)
+        self.lock.release()
+
+
+    def get_path(self, segname):
+        return self.segname_to_filename[segname]
+
+
+def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event, file_system_clear_approved):
     playlist = Queue()
     time_into_first_segment = 0
+    file_system_wrapper = FileSystemWrapper(SEGMENT, SEGMENT)
+    clear_file_system = False
     while True:
         current_msg_encoded = input_queue.get()
         if not current_msg_encoded == IGNORE:
@@ -47,6 +101,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             input_queue.put(IGNORE)
             expect_m3u8_and_url[0] = False
             downloaded_segments = dict()
+            clear_file_system = True
             with scrollbar_lock:
                 playing_event.set((track_length, 0))  # (track_length, current_time)
         elif expect_m3u8_and_url[0]:
@@ -56,15 +111,19 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
             time_into_first_segment = change_time(playlist, play_queue, segment_times, segment_reqs, new_time)
             fetch_change_event.clear()
             player_change_track_event.set()
-            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
+            if clear_file_system:
+                file_system_clear_approved.clear()
+                file_system_wrapper.clear(wait_for=file_system_clear_approved)
+                clear_file_system = False
+            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper)
             if next_request:
                 send_queue.put(next_request.encode())
                 print(next_request)
         else:
-            segment = process_m4a(body, segment_num)
+            segment = process_m4a(body, segment_num, file_system_wrapper)
             downloaded_segments[segment_num] = segment
-            play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment))
-            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
+            play_queue.put(file_system_wrapper.get_path(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper)))
+            next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper)
             if next_request:
                 send_queue.put(next_request.encode())
                 print(next_request)
@@ -79,7 +138,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
                     time_into_first_segment = change_time(playlist, play_queue, segment_times, segment_reqs, curr_time)
                     player_change_track_event.set()
                     fetch_change_event.clear()
-                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event)
+                    next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper)
                     if next_request:
                         fetch_change_event.clear()
                         send_queue.put(next_request.encode())
@@ -111,7 +170,7 @@ def process_m3u8(data, dir, playlist):
     return track_length, segment_times, segment_reqs
 
 
-def process_m4a(data, segment_num):
+def process_m4a(data, segment_num, file_system_wrapper):
     with open('input.m4a', 'wb') as input_file_for_ffmpeg:
         input_file_for_ffmpeg.write(data)
     with open(os.devnull, 'rb') as devnull:
@@ -119,8 +178,7 @@ def process_m4a(data, segment_num):
     p_out, p_err = p.communicate()
     assert p.returncode == 0
     segment = bytes(p_out)
-    with open(SEGMENT(segment_num), 'wb') as f:
-        f.write(segment)
+    file_system_wrapper.save(SEGMENT(segment_num), segment)
     return SEGMENT(segment_num)
 
 
@@ -142,15 +200,17 @@ def change_time(playlist, play_queue, segment_times, segment_reqs, new_time):
     return time_into_first_segment
 
 
-def handle_segment(segment, is_first_seg, time_into_first_segment):
+def handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper):
     if is_first_seg:
-        audioseg = AudioSegment.from_file(segment, 'wav')
+        audioseg = AudioSegment.from_file(file_system_wrapper.get_path(segment), 'wav')
         audioseg[time_into_first_segment * 1000:].export(TEMP_START_SEG, format='wav')
+        with open(TEMP_START_SEG, 'rb') as f:
+            file_system_wrapper.save(TEMP_START_SEG, f.read())
         segment = TEMP_START_SEG
     return segment
 
 
-def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event):
+def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper):
     next_request, segment_num, is_first_seg = None, None, None
     loop_broken = False
     while not playlist.empty():
@@ -162,7 +222,7 @@ def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_int
             loop_broken = True
             break
         segment = downloaded_segments[segment_num]
-        play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment))
+        play_queue.put(file_system_wrapper.get_path(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper)))
     if not loop_broken:
         return None, None, None
     return next_request, segment_num, is_first_seg

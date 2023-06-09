@@ -12,7 +12,7 @@ CHUNK_SIZE = 256
 NEXT_SONG = 'next_song'
 
 
-def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal):
+def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal, file_system_clear_approved):
     p = pyaudio.PyAudio()
     output = p.open(format=8,
                     channels=1,
@@ -20,6 +20,7 @@ def player(play_queue, pause_event, play_event, change_track_event, play_next_so
                     output=True,
                     )
     while True:
+        file_system_clear_approved.set()
         input_path = play_queue.get()
         change_track_event.wait()
         change_track_event.clear()
