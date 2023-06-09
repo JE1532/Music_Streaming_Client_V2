@@ -10,6 +10,7 @@
 
 import sys
 import os
+import threading
 from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
@@ -138,7 +139,10 @@ PLAYLIST_UPLOAD_OK = b'Upload_Resp/Upload_Successful'
 PLAYLIST_UPLOAD_FAILED = b'Upload_Resp/Upload_Failed'
 
 
-class Ui_MainWindow(object):
+class Ui_MainWindow(QObject):
+
+    upload_done_signal = Signal((bytes,))
+
     def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
@@ -164,6 +168,8 @@ class Ui_MainWindow(object):
         self.username = None
         self.search_releasers = []
         self.playlist_releasers = []
+        self.resp_receiver_thread = None
+        self.upload_done_signal.connect(self.end_upload)
         self.sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.sizePolicy.setHorizontalStretch(0)
         self.sizePolicy.setVerticalStretch(0)
@@ -922,7 +928,7 @@ class Ui_MainWindow(object):
         self.SwitchToSignUpButton.clicked.connect(self.switch_to_sign_up)
         self.upload_page_add_song_button.clicked.connect(self.add_song_to_upload_playlist)
         self.upload_page_choose_pic_button.clicked.connect(self.change_upload_playlist_picture)
-        self.upload_page_upload_button.clicked.connect(self.upload_playlist)
+        self.upload_page_upload_button.clicked.connect(self.upload)
         self.upload_playlist = Playlist()
 
         # linking buttons in sign up window to functions
@@ -1396,16 +1402,23 @@ class Ui_MainWindow(object):
         return self.login_approved[0]
 
 
-    def upload_playlist(self):
+    def upload(self):
         if self.upload_page_playlist_name.toPlainText() == '':
             return
         request = construct_upload_playlist_request(UPLOAD_PLAYLIST_PIC, self.upload_playlist, self.upload_page_playlist_name.toPlainText())
         self.send_queue.put(request)
-        self.process_upload_response()
+        self.upload_page_upload_stacked_widget.setCurrentWidget(self.upload_page_during_upload)
+        self.resp_receiver_thread = threading.Thread(target=self.process_upload_response)
+        self.resp_receiver_thread.start()
 
 
     def process_upload_response(self):
         response = self.upload_resp_queue.get()
+        self.upload_done_signal.emit(response)
+
+
+    @Slot(bytes)
+    def end_upload(self, response):
         msg = QMessageBox()
         if response == PLAYLIST_UPLOAD_OK:
             msg.setWindowTitle('Upload Successful')
@@ -1415,6 +1428,7 @@ class Ui_MainWindow(object):
                                          lambda: self.upload_page_playlist_name.clear()]
             finisher = get_finisher(upload_playlist_releasers)
             finisher()
+            self.upload_page_upload_stacked_widget.setCurrentWidget(self.upload_page_before_upload)
             msg.exec_()
         else:
             msg.setWindowTitle('Upload Failed')
