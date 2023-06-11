@@ -14,9 +14,11 @@ SEGMENT = lambda serial: f'segment{serial}.wav'
 TEMP_START_SEG = 'temp_start_file.wav'
 #CONVERTION_COMMAND = ['ffmpeg', '-y', '-f', 'mp4', '-read_ahead_limit', '-1', '-i', 'cache:pipe:0', '-acodec', 'pcm_s16le', '-vn', '-f', 'wav', '-']
 CONVERTION_COMMAND = ['ffmpeg', '-f', 'mpegts', '-i', 'input.ts', '-f', 'wav', '-sample_fmt', 's16', '-ar', '44100', '-']
+FFPROBE_COMMAND_TO_GET_CHANNELS = ['ffprobe', '-i', 'pipe:0', '-show_entries', 'stream=channels', '-v', 'quiet']
+GET_NUM_CHANNELS = lambda p_out: int(dict([line.split('=') if '=' in line else (line, line) for line in p_out.decode().split('\n')])['channels'])
 #p = subprocess.Popen(conversion_command, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 IGNORE = None
-NEXT_SONG = 'next_song'
+NEXT_SONG = 'next_song', None
 
 
 class FileSystemWrapper:
@@ -122,7 +124,7 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
         else:
             segment = process_m4a(body, segment_num, file_system_wrapper)
             downloaded_segments[segment_num] = segment
-            play_queue.put(file_system_wrapper.get_path(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper)))
+            play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper))
             next_request, segment_num, is_first_seg = play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper)
             if next_request:
                 send_queue.put(next_request.encode())
@@ -201,13 +203,19 @@ def change_time(playlist, play_queue, segment_times, segment_reqs, new_time):
 
 
 def handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper):
+    num_channels = None
     if is_first_seg:
         audioseg = AudioSegment.from_file(file_system_wrapper.get_path(segment), 'wav')
         audioseg[time_into_first_segment * 1000:].export(TEMP_START_SEG, format='wav')
         with open(TEMP_START_SEG, 'rb') as f:
-            file_system_wrapper.save(TEMP_START_SEG, f.read())
+            data = f.read()
+            file_system_wrapper.save(TEMP_START_SEG, data)
+        p = subprocess.Popen(FFPROBE_COMMAND_TO_GET_CHANNELS, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p_out, p_err = p.communicate(input=data)
+        assert p.returncode == 0
+        num_channels = GET_NUM_CHANNELS(p_out)
         segment = TEMP_START_SEG
-    return segment
+    return file_system_wrapper.get_path(segment), num_channels
 
 
 def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_into_first_segment, fetch_change_event, file_system_wrapper):
@@ -222,7 +230,7 @@ def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_int
             loop_broken = True
             break
         segment = downloaded_segments[segment_num]
-        play_queue.put(file_system_wrapper.get_path(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper)))
+        play_queue.put(handle_segment(segment, is_first_seg, time_into_first_segment, file_system_wrapper))
     if not loop_broken:
         return None, None, None
     return next_request, segment_num, is_first_seg

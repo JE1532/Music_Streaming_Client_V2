@@ -14,14 +14,17 @@ NEXT_SONG = 'next_song'
 
 def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal, file_system_clear_approved):
     p = pyaudio.PyAudio()
-    output = p.open(format=8,
-                    channels=1,
-                    rate=RATE,
-                    output=True,
-                    )
+    num_channels = None
+    output = None
     while True:
         file_system_clear_approved.set()
-        input_path = play_queue.get()
+        input_path, num_channels = play_queue.get()
+        if num_channels != None:
+            output = p.open(format=8,
+                            channels=num_channels,
+                            rate=RATE,
+                            output=True,
+                            )
         change_track_event.wait()
         change_track_event.clear()
         if input_path == NEXT_SONG:
