@@ -1420,6 +1420,7 @@ class Ui_MainWindow(QObject):
     @Slot(bytes)
     def end_upload(self, response):
         msg = QMessageBox()
+        self.upload_page_upload_stacked_widget.setCurrentWidget(self.upload_page_before_upload)
         if response == PLAYLIST_UPLOAD_OK:
             msg.setWindowTitle('Upload Successful')
             msg.setText('Upload Successful!')
@@ -1428,7 +1429,6 @@ class Ui_MainWindow(QObject):
                                          lambda: self.upload_page_playlist_name.clear()]
             finisher = get_finisher(upload_playlist_releasers)
             finisher()
-            self.upload_page_upload_stacked_widget.setCurrentWidget(self.upload_page_before_upload)
             msg.exec_()
         else:
             msg.setWindowTitle('Upload Failed')

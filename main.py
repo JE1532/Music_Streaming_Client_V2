@@ -57,6 +57,7 @@ def main():
         ca_certs=ROOTCA
     )
     sock.connect(SERVER)
+    sock_save = sock
     sock = SocketWrapper(sock)
     print('connected!')
     threads = []
