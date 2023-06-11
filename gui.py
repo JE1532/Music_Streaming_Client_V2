@@ -21,6 +21,59 @@ from os.path import basename
 RecordType = Enum('RecordType', ['song', 'playlist'])
 
 
+class Captcha_Window(QMessageBox):
+    def __init__(self, captcha_pic_path, submit):
+        super().__init__()
+
+        self.layout().setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setWindowTitle(CAPTCHA_TITLE)
+
+        #### prompt label ####
+        self.label = QLabel(self)
+        self.label.setText(CAPTCHA_PROMPT)
+        self.layout().addWidget(self.label, 0, 0, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        #### picture label for captcha ####
+        pixmap = QPixmap()
+        pixmap.load(captcha_pic_path)
+        self.captcha_label = QLabel(self)
+        self.captcha_label.setPixmap(pixmap)
+        self.layout().addWidget(self.captcha_label, 1, 0, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        #### text browser for solution ####
+        self.solution_entry = QTextBrowser(self)
+        self.solution_entry.setPlaceholderText(CAPTCHA_PLACEHOLDER_TEXT)
+        self.solution_entry.setMaximumHeight(30)
+        self.solution_entry.setMaximumWidth(200)
+        self.solution_entry.setMinimumWidth(200)
+        self.solution_entry.setMinimumHeight(30)
+        self.solution_entry.setReadOnly(False)
+        self.layout().addWidget(self.solution_entry, 2, 0, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        #### submit button ####
+        self.button = QPushButton(self)
+        self.button.setText(CAPTCHA_SUBMIT)
+        self.button.clicked.connect(submit)
+        self.layout().addWidget(self.button, 3, 0, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # removing redundant default button
+        self.layout().removeWidget(self.findChild(QDialogButtonBox, "qt_msgbox_buttonbox"))
+
+
+    def get_solution(self):
+        return self.solution_entry.toPlainText()
+
+
+    def load_captcha(self, captcha_pic_path):
+        pixmap = QPixmap()
+        pixmap.load(captcha_pic_path)
+        self.captcha_label.setPixmap(pixmap)
+
+
+    def clear_text_field(self):
+        self.solution_entry.clear()
+
+
 class Record:
     def __init__(self, internal_name, external_name, picture_path, likes, listennings, pic_serial, type):
         self.internal_name = internal_name
@@ -112,6 +165,10 @@ SIGN_IN_LABEL = 'Please enter your username and password.'
 SIGN_UP_LABEL = 'Please enter your username, password and email.'
 SIGN_IN_LABEL_AFTER_FAIL = 'Wrong username or password. Please enter credentials again.'
 SIGN_UP_LABEL_AFTER_FAIL = 'User already exists. Please try another email or username.'
+CAPTCHA_TITLE = "I'm not a robot"
+CAPTCHA_PROMPT = "Please copy the characters to the textbox (a-z only)."
+CAPTCHA_SUBMIT = "Submit"
+CAPTCHA_PLACEHOLDER_TEXT = "Enter your solution here..."
 PROFILE_PIC_PATH = 'profile_pic.jpg'
 SONG_RECOMMENDATION_COUNT = 8
 SONG_RECOMMENDATION_PROMPT = '^Song_Recommendations'
@@ -124,8 +181,16 @@ FETCH_RECORD_RESPONSE_PREFIX = 'Fetched'
 RECORD_PIC_PATH = lambda identifier: f"record_pictures/{identifier}"
 HOME_RECOMMENDATION_IDENTIFIER = lambda n: f"home_pic#{n}.jpg"
 REQUEST_PROFILE_PICTURE = 'Gui/Get_Profile_Picture@'
+CAPTCHA_REQUEST = b'Gui/Request_Captcha@'
+CAPTCHA_MSG_PREFIX = b'Gui/captcha='
+CAPTCHA_SUBMITION_PREFIX = lambda solution: f'UserProcessor/Submit_Captcha/solution={solution}@'.encode()
+CAPTCHA_SOLUTION_ACCEPTED = b'Gui/Captcha_Response/200'
+CAPTCHA_SOLUTION_DENIED = b'Gui/Captcha_Response/400'
+CAPTCHA_PATH = 'captcha.jpg'
 PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
 STRING_TO_TYPE = {b'Song': RecordType.song, b'Playlist': RecordType.playlist}
+CREDENTIALS = 'credentials'
+CAPTCHA = 'captcha'
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
 DEFAULT_UPLOAD_PLAYLIST_PIC = 'default_upload_playlist_pic.jpg'
@@ -1369,25 +1434,29 @@ class Ui_MainWindow(QObject):
 
 
     def sign_in(self):
-        self.send_queue.put(str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()).encode())
-        successful = self.log_in(self.username_for_sign_in.text())
+        msg = str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()).encode()
+        successful, cause = self.log_in(self.username_for_sign_in.text(), msg)
         self.username_for_sign_in.clear()
         self.password_for_sign_in.clear()
-        if not successful:
+        if not successful and cause == CREDENTIALS:
             self.sign_in_label.setText(SIGN_IN_LABEL_AFTER_FAIL)
 
     def sign_up(self):
-        self.send_queue.put(str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode())
-        successful = self.log_in(self.username_for_sign_up.text())
+        msg = str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode()
+        successful, cause = self.log_in(self.username_for_sign_up.text(), msg)
         self.username_for_sign_up.clear()
         self.password_for_sign_up.clear()
         self.password_confiem_for_sign_up.clear()
         self.email_for_sign_up.clear()
-        if not successful:
+        if not successful and cause == CREDENTIALS:
             self.sign_up_label.setText(SIGN_UP_LABEL_AFTER_FAIL)
 
 
-    def log_in(self, username):
+    def log_in(self, username, msg):
+        captcha_passed = self.solve_captcha()
+        if not captcha_passed:
+            return False, CAPTCHA
+        self.send_queue.put(msg)
         self.login_finished_event.clear()
         self.login_finished_event.wait()
         if self.login_approved[0]:
@@ -1399,7 +1468,12 @@ class Ui_MainWindow(QObject):
             self.left_side_profile_pic_label.setPixmap(self.profile_pixmap)
             self.profile_picture_label.setPixmap(self.profile_pixmap)
             self.profile_username_label.setText(username)
-        return self.login_approved[0]
+        return self.login_approved[0], CREDENTIALS
+
+
+    def solve_captcha(self):
+        self.request_captcha()
+        return self.get_captcha_response(CAPTCHA_PATH)
 
 
     def upload(self):
@@ -1486,6 +1560,37 @@ class Ui_MainWindow(QObject):
             os.remove(pic_path)
             self.pic_serials.add(pic_serial)
         return release_picture
+
+    def get_captcha_response(self, captcha_pic_path):
+        output = [False]
+
+        #create window
+        window = Captcha_Window(captcha_pic_path, lambda: self.submit_captcha(window, output, window.get_solution()))
+
+        #executing window
+        window.exec()
+
+        return output[0]
+
+    def submit_captcha(self, window, output, solution):
+        self.send_queue.put(CAPTCHA_SUBMITION_PREFIX(solution))
+        response = self.gui_msg_queue.get()
+        if response == CAPTCHA_SOLUTION_ACCEPTED:
+            output[0] = True
+            window.accept()
+        else:
+            self.request_captcha()
+            window.clear_text_field()
+            window.load_captcha(CAPTCHA_PATH)
+
+
+    def request_captcha(self):
+        self.send_queue.put(CAPTCHA_REQUEST)
+        response = self.gui_msg_queue.get()
+        image = response[len(CAPTCHA_MSG_PREFIX):]
+        with open(CAPTCHA_PATH, 'wb') as captcha_file:
+            captcha_file.write(image)
+
 
     def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
         self.app = QApplication(sys.argv)
