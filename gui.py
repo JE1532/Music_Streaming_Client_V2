@@ -1448,7 +1448,7 @@ class Ui_MainWindow(QObject):
 
     def sign_up(self):
         msg = str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode()
-        credentials = (self.username_for_sign_up, self.password_for_sign_up, self.email_for_sign_up)
+        credentials = (self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text())
         successful, cause = self.log_in(credentials, msg)
         self.username_for_sign_up.clear()
         self.password_for_sign_up.clear()
