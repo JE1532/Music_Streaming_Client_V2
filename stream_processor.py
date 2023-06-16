@@ -9,7 +9,7 @@ import threading
 M3U8 = b'#EXTM3U'
 EXTINF = b'EXTINF'
 
-REQ = lambda dir, relative_path: f"""GET /{dir + '/' + relative_path} HTTP/1.1@"""
+REQ = lambda dir, relative_path: f"""GET /{dir + '/' + relative_path} HTTP/1.1\r\n\r\n"""
 SEGMENT = lambda serial: f'segment{serial}.wav'
 TEMP_START_SEG = 'temp_start_file.wav'
 #CONVERTION_COMMAND = ['ffmpeg', '-y', '-f', 'mp4', '-read_ahead_limit', '-1', '-i', 'cache:pipe:0', '-acodec', 'pcm_s16le', '-vn', '-f', 'wav', '-']

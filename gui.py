@@ -158,7 +158,7 @@ def get_finisher(release_functions):
     return finisher
 
 
-SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1'
+SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1\r\n\r\n'
 SIGN_UP = 'UserProcessor/SignUp?username={}&password={}&email={}@'
 SIGN_IN = 'UserProcessor/SignIn?username={}&password={}@'
 SIGN_IN_LABEL = 'Please enter your username and password.'
