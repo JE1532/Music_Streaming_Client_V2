@@ -191,6 +191,8 @@ PROFILE_PIC_RESPONSE_PREFIX = b'Gui/Profile_Picture='
 STRING_TO_TYPE = {b'Song': RecordType.song, b'Playlist': RecordType.playlist}
 CREDENTIALS = 'credentials'
 CAPTCHA = 'captcha'
+CREDENTIAL_TOO_LONG = 'credential_too_long'
+CREDENTIAL_TOO_LONG_MSG = 'One of your credentials exceeded permitted length.\r\n Credential length must not exceed 64 characters. Please try again.'
 
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
 DEFAULT_UPLOAD_PLAYLIST_PIC = 'default_upload_playlist_pic.jpg'
@@ -1435,24 +1437,34 @@ class Ui_MainWindow(QObject):
 
     def sign_in(self):
         msg = str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()).encode()
-        successful, cause = self.log_in(self.username_for_sign_in.text(), msg)
+        credentials = (self.username_for_sign_in.text(), self.password_for_sign_in.text())
+        successful, cause = self.log_in(credentials, msg)
         self.username_for_sign_in.clear()
         self.password_for_sign_in.clear()
         if not successful and cause == CREDENTIALS:
             self.sign_in_label.setText(SIGN_IN_LABEL_AFTER_FAIL)
+        elif not successful and cause == CREDENTIAL_TOO_LONG:
+            self.sign_in_label.setText(CREDENTIAL_TOO_LONG_MSG)
 
     def sign_up(self):
         msg = str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode()
-        successful, cause = self.log_in(self.username_for_sign_up.text(), msg)
+        credentials = (self.username_for_sign_up, self.password_for_sign_up, self.email_for_sign_up)
+        successful, cause = self.log_in(credentials, msg)
         self.username_for_sign_up.clear()
         self.password_for_sign_up.clear()
         self.password_confiem_for_sign_up.clear()
         self.email_for_sign_up.clear()
         if not successful and cause == CREDENTIALS:
             self.sign_up_label.setText(SIGN_UP_LABEL_AFTER_FAIL)
+        elif not successful and cause == CREDENTIAL_TOO_LONG:
+            self.sign_up_label.setText(CREDENTIAL_TOO_LONG_MSG)
 
 
-    def log_in(self, username, msg):
+    def log_in(self, credentials, msg):
+        username = credentials[0]
+        for credential in credentials:
+            if len(credential) > 64:
+                return False, CREDENTIAL_TOO_LONG
         captcha_passed = self.solve_captcha()
         if not captcha_passed:
             return False, CAPTCHA
