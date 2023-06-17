@@ -16,6 +16,7 @@ from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from enum import Enum
 from os.path import basename
+import datetime
 
 
 RecordType = Enum('RecordType', ['song', 'playlist'])
@@ -1578,7 +1579,7 @@ class Ui_MainWindow(QObject):
 
     def set_scrollbar_value(self, val, current_time, total_length):
         self.player_scrollbar.setValue(1000 * val)
-        self.player_track_name.setText(PLAYER_SONG_NAME_TEXT(int(current_time), int(total_length), self.current_song.external_name))
+        self.player_track_name.setText(PLAYER_SONG_NAME_TEXT(str(datetime.timedelta(seconds=int(current_time))), str(datetime.timedelta(seconds=int(total_length))), self.current_song.external_name))
 
 
     def get_release_for_picture(self, pic_serial, pic_path):
