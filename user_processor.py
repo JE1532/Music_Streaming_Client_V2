@@ -1,5 +1,9 @@
 AUTH_APPROVED = '200'
 
+
+TERMINATE = 'exit!'
+
+
 class UserProcessor:
     def __init__(self, login_finished_event, login_approved, input_queue):
         self.login_finished_event = login_finished_event
@@ -9,7 +13,10 @@ class UserProcessor:
 
     def start(self):
         while True:
-            self.process_input(self.input_queue.get())
+            req = self.input_queue.get()
+            if req == TERMINATE:
+                return
+            self.process_input(req)
 
 
     def process_input(self, rec_input):

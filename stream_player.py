@@ -10,6 +10,7 @@ RATE = 44100
 CHUNK_SIZE = 256
 
 NEXT_SONG = 'next_song'
+TERMINATE = 'exit!'
 
 
 def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal, file_system_clear_approved):
@@ -19,6 +20,8 @@ def player(play_queue, pause_event, play_event, change_track_event, play_next_so
     while True:
         file_system_clear_approved.set()
         input_path, num_channels = play_queue.get()
+        if input_path == TERMINATE:
+            return
         if num_channels != None:
             output = p.open(format=8,
                             channels=num_channels,

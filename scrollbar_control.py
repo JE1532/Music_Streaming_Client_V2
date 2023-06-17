@@ -5,6 +5,8 @@ from threading import Event
 
 TIME_STEP = 0.1
 
+TERMINATE = 'exit!'
+
 
 class InfoEvent(Event):
     def __init__(self):
@@ -38,6 +40,8 @@ def scrollbar_control(event, gui, scrollbar_lock, paused_event):
         with scrollbar_lock:
             if event.isSet():
                 if not event.is_pause_play or currently_playing == False:
+                    if event.info == TERMINATE:
+                        return
                     currently_playing = True
                     track_length, current_time_in_secs = event.info
                     #print(track_length)

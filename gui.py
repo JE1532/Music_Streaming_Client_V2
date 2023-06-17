@@ -1606,11 +1606,23 @@ class Ui_MainWindow(QObject):
 
     def start(self, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
         self.app = QApplication(sys.argv)
-        self.MainWindow = QMainWindow()
+        self.MainWindow = AppMainWindow(self.app)
         self.setupUi(self.MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue)
         self.go_to_page(1, 2)
         self.MainWindow.show()
-        sys.exit(self.app.exec())
+        self.app.exec()
+
+
+class AppMainWindow(QMainWindow):
+    def __init__(self, parent_app: QApplication):
+        super().__init__()
+        self.parent_app = parent_app
+
+
+    @Slot(QCloseEvent)
+    def closeEvent(self, event: QCloseEvent):
+        super().closeEvent(event)
+        self.parent_app.exit(0)
 
 
 def empty_layout(layout):

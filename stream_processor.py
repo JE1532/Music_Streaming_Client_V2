@@ -4,6 +4,7 @@ from os.path import dirname
 import os
 import subprocess
 import threading
+import sys
 
 
 M3U8 = b'#EXTM3U'
@@ -19,6 +20,9 @@ GET_NUM_CHANNELS = lambda p_out: int(dict([line.split('=') if '=' in line else (
 #p = subprocess.Popen(conversion_command, stdin=devnull, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 IGNORE = None
 NEXT_SONG = 'next_song', None
+
+
+TERMINATE = 'exit!'
 
 
 class FileSystemWrapper:
@@ -79,6 +83,8 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
     clear_file_system = False
     while True:
         current_msg_encoded = input_queue.get()
+        if current_msg_encoded == TERMINATE:
+            terminate(expect_m3u8_and_url, play_queue, player_change_track_event)
         if not current_msg_encoded == IGNORE:
             separation_index = bytes.find(current_msg_encoded, b'\r\n\r\n')
             assert separation_index != -1
@@ -94,6 +100,8 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
         if body[:len(M3U8)] == M3U8 and expect_m3u8_and_url[0]:
             del playlist
             playlist = Queue()
+            if expect_m3u8_and_url[0] == TERMINATE:
+                terminate(expect_m3u8_and_url, play_queue, player_change_track_event)
             dir = dirname(expect_m3u8_and_url[1])
             track_length, segment_times, segment_reqs = process_m3u8(body, dir, playlist)
             fetch_change_event.info = (track_length, 0, False)
@@ -234,3 +242,16 @@ def play_downloaded_segments(playlist, downloaded_segments, play_queue, time_int
     if not loop_broken:
         return None, None, None
     return next_request, segment_num, is_first_seg
+
+
+
+def terminate(expect_m3u8_and_url, play_queue, player_change_track_event):
+    player_play_event = expect_m3u8_and_url[1]
+    scrollbar_info_event = expect_m3u8_and_url[-1]
+    while not play_queue.empty():
+        play_queue.get()
+    play_queue.put((TERMINATE, -1))
+    player_change_track_event.set()
+    player_play_event.set()
+    scrollbar_info_event.set(TERMINATE)
+    sys.exit(0)

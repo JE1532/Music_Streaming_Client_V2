@@ -1,4 +1,5 @@
 import threading
+import sys
 import ssl
 from queue import Queue
 import socket
@@ -19,6 +20,8 @@ from socket_wrapper import SocketWrapper
 
 SERVER = ('127.0.0.1', 9010)
 ROOTCA = 'rootCA.crt'
+
+TERMINATE = 'exit!'
 
 
 class StreamReceiver(qtc.QObject):
@@ -91,7 +94,7 @@ def main():
     stream_rec = StreamReceiver(gui)
     stream_rec.play_next_song_signal.connect(gui.play_next_song)
     stream = threading.Thread(target=play_stream, args=(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, stream_rec.play_next_song_signal))
-    stream.start()
+    threads.append(stream)
 
 
     for thread in threads:
@@ -99,8 +102,15 @@ def main():
 
     gui.start(send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue)
 
-    for thread in threads:
-        thread.join()
+    for q in (send_queue, rec_queue, user_replies_queue):
+        q.put(TERMINATE)
+    gui.expect_m3u8_and_url[0] = TERMINATE
+    gui.expect_m3u8_and_url[1] = gui.player_play_event
+    gui.expect_m3u8_and_url.append(gui.scrollbar_playing_event)
+    gui.player_fetching_event.set((0, 0, True))
+    stream_queue.put(TERMINATE)
+    sock.sock.close()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

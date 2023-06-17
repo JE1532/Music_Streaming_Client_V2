@@ -11,5 +11,10 @@ class Receiver:
 
     def start(self):
         while True:
-            current = self.receive_input()
-            self.input_pass_queue.put(current)
+            try:
+                current = self.receive_input()
+                self.input_pass_queue.put(current)
+            except ConnectionAbortedError:
+                return
+            except OSError:
+                return
