@@ -33,6 +33,21 @@ class StreamReceiver(qtc.QObject):
 
 
 def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing_event, scrollbar_lock, gui, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, play_next_song_signal):
+    """
+    Initiate all threads related to playing audio
+    :param stream_queue: queue of relevant msgs from server
+    :param send_queue: queue for sending
+    :param expect_m3u8_and_url: (InfoEvent) contains relevant information to streaming. triggered when expecting a .m3u8 file.
+    :param scrollbar_playing_event: event to make scrollbar start moving.
+    :param scrollbar_lock: (threading.Lock) for scrollbar changes, for race conditions.
+    :param gui: (Ui_MainWindow) gui object
+    :param player_pause_event: indicates when playing is paused
+    :param player_play_event: indicates when playing is resumed
+    :param player_fetching_event: (InfoEvent) indicates changes in fetching.
+    :param scrollbar_paused_event: (threading.Event)
+    :param play_next_song_signal: signal for making gui respond to playing next song in playlist.
+    :return:
+    """
     play_queue = Queue()
     player_change_track_event = threading.Event()
     file_system_clear_approved = threading.Event()
@@ -51,6 +66,10 @@ def play_stream(stream_queue, send_queue, expect_m3u8_and_url, scrollbar_playing
 
 
 def main():
+    """
+    Connects to server and initializes all threads.
+    :return:
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock = ssl.wrap_socket(
         sock,

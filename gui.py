@@ -23,7 +23,18 @@ RecordType = Enum('RecordType', ['song', 'playlist'])
 
 
 class Captcha_Window(QMessageBox):
+    """
+    This class handles the gui aspects of the captcha window displayed upon login.
+    It requires a function to execute upon captcha solution submition.
+    Inherits from QMessageBox.
+    """
     def __init__(self, captcha_pic_path, submit):
+        """
+        Initialize captcha window.
+
+        :param captcha_pic_path: path of captcha to display.
+        :param submit: function to execute when the user presses 'submit' button.
+        """
         super().__init__()
 
         self.layout().setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -62,21 +73,48 @@ class Captcha_Window(QMessageBox):
 
 
     def get_solution(self):
+        """
+        Get solution text from textbox. meant to be used in self.submit, after the user has submitted
+        their solution.
+        :return: (string) text in textbox.
+        """
         return self.solution_entry.toPlainText()
 
 
     def load_captcha(self, captcha_pic_path):
+        """
+        Display a new image in captcha window (instead of previous captcha).
+        :param captcha_pic_path: (string) path of new picture to display.
+        :return: None
+        """
         pixmap = QPixmap()
         pixmap.load(captcha_pic_path)
         self.captcha_label.setPixmap(pixmap)
 
 
     def clear_text_field(self):
+        """
+        Clears textbox.
+        :return: None
+        """
         self.solution_entry.clear()
 
 
 class Record:
+    """
+    Data-bearing class that represents songs and playlist (each instance represents a single song or playlist).
+    """
     def __init__(self, internal_name, external_name, picture_path, likes, listennings, pic_serial, type):
+        """
+        Initialize a record.
+        :param internal_name (str): internal name of record.
+        :param external_name (str): external name of record.
+        :param picture_path (str): path of record's picture (displayed on screen)
+        :param likes (int): amount of likes.
+        :param listennings (int): amount of listenings.
+        :param pic_serial (int): serial number of record's picture's file.
+        :param type (RecordType): recor is song or playlist.
+        """
         self.internal_name = internal_name
         self.external_name = external_name
         self.picture_path = picture_path
@@ -89,21 +127,41 @@ class Record:
 
 
 class GuiComponents:
+    """
+    This class is designed to represent the gui aspects of a single object.
+    Is only used by upload mechanism.
+    """
     def __init__(self, delete, load_picture):
+        """
+        Initialize gui representation of some item (for example, of a song in the upload playlist).
+        :param delete (function -> None): parameterless function that deletes gui representation.
+        :param load_picture (function str -> None): function with 1 parameter - string which is picture's path and loads picture into gui representation.
+        """
         self.delete = delete
         self.load_picture = load_picture
 
 
 class Playlist:
+    """
+    An instance of this class represents a playlist - including it's gui aspects.
+    Is only used in upload mechanism.
+    """
     def __init__(self):
-        self.song_to_num = dict()
-        self.num_to_song = dict()
-        self.song_to_file = dict()
-        self.song_to_gui_components = dict()
+        """
+        Initialize a playlist.
+        """
+        self.song_to_num = dict()  # Record object to song number.
+        self.num_to_song = dict()  # song number to Record object.
+        self.song_to_file = dict()  # Record object to audio file path.
+        self.song_to_gui_components = dict()  # Record object to gui components of particular song.
         self.size = 0
 
 
     def iterator(self):
+        """
+        Generator that serves as iterator for this class.
+        :return:
+        """
         for i in range(1, self.size + 1):
             curr = self.num_to_song[i]
             yield self.song_to_file[curr], curr.external_name
@@ -113,46 +171,76 @@ class Playlist:
         return self.iterator()
 
     def set_picture(self, pic_path):
+        """
+        Playlist has a single picture for all songs. Sets it.
+        Default is stored in path 'default_upload_playlist_pic.jpg'.
+        :param pic_path: path of picture.
+        :return:
+        """
         for gui_components in self.song_to_gui_components.values():
-            gui_components.load_picture(pic_path)
+            gui_components.load_picture(pic_path)  # set all gui components of all songs' picutre
 
 
     def append_song(self, song, filename, gui_components):
-        self.size += 1
+        """
+        Append a song to playlist.
+        :param song: Record object representing song.
+        :param filename: string representing file path of audio.
+        :param gui_components: appropriate gui components.
+        :return:
+        """
+        self.size += 1  # increment size
         self.num_to_song[self.size] = song
         self.song_to_num[song] = self.size
         self.song_to_file[song] = filename
-        self.song_to_gui_components[song] = gui_components
+        self.song_to_gui_components[song] = gui_components  # add to respective dictionaries.
 
 
     def remove_song(self, song):
-        num = self.song_to_num[song]
+        """
+        Removes a song from playlist.
+        :param song: Record object that represents song.
+        :return: None
+        """
+        num = self.song_to_num[song]  # get song num
         self.song_to_num.pop(song)
         self.num_to_song.pop(num)
-        self.song_to_file.pop(song)
+        self.song_to_file.pop(song)  # pop song from all dicts.
         gui_representation = self.song_to_gui_components[song]
-        gui_representation.delete()
-        self.song_to_gui_components.pop(song)
+        gui_representation.delete()  # delete gui representation of song.
+        self.song_to_gui_components.pop(song)  # pop song from song_to_gui_components.
         for i in range(num + 1, self.size + 1):
             curr_song = self.num_to_song[i]
             self.num_to_song.pop(i)
             self.song_to_num.pop(curr_song)
             self.num_to_song[i - 1] = curr_song
-            self.song_to_num[curr_song] = i - 1
+            self.song_to_num[curr_song] = i - 1  # update song numbers of songs after current one.
         self.size -= 1
 
 
     def clear(self):
+        """
+        clear playlist.
+        :return: None
+        """
         for song in self.song_to_num:
-            self.song_to_gui_components[song].delete()
+            self.song_to_gui_components[song].delete()  # delete all gui representations
         self.size = 0
         self.song_to_num = dict()
         self.song_to_gui_components = dict()
         self.song_to_file = dict()
-        self.num_to_song = dict()
+        self.num_to_song = dict()  # clear all dictionaries
 
 
 def get_finisher(release_functions):
+    """
+    A finisher is a function called to release all resources occupied by a particular item
+    - for example file path and gui representation dedicated to a particular record.
+    This function takes a few functions representing releasers for individual resources
+    and returns finisher to release all resources (finisher is a parameterless function.
+    :param release_functions: list of parameterless functions.
+    :return:
+    """
     def finisher():
         for release in release_functions:
             release()
@@ -215,6 +303,22 @@ class Ui_MainWindow(QObject):
     upload_done_signal = Signal((bytes,))
 
     def setupUi(self, MainWindow, send_queue, login_finished_event, login_approved, expect_m3u8_and_url, scrollbar_playing_event, player_pause_event, player_play_event, player_fetching_event, scrollbar_paused_event, gui_msg_queue, upload_resp_queue):
+        """
+        Initializes all objects concerning ui besides dynamic ones like individual song gui representations.
+        :param MainWindow: QMainWindow for gui
+        :param send_queue: (Queue) send queue.
+        :param login_finished_event (threading.Event): that indicates login has finished.
+        :param login_approved (list): with one item (boolean) representing login success.
+        :param expect_m3u8_and_url (InfoEvent): representing expectations of a new .m3u8 and origin url of that file on server.
+        :param scrollbar_playing_event (threading.Event): turns on when scrollbar is playing.
+        :param player_pause_event (threading.Event): turns on when playing is paused.
+        :param player_play_event (threading.Event): turns on when playing is un-paused.
+        :param player_fetching_event: (InfoEvent) turns on when user moved scrollbar or pressed on new song. info is (track_length (in seconds), time to start playing from (in seconds), (boolean) is this a new song or usre just moved scrollbar).
+        :param scrollbar_paused_event: (threading.Event) turns on when scrollbar should be paused.
+        :param gui_msg_queue: (Queue) queue of messages from server.
+        :param upload_resp_queue: (Queue) queue of upload request replies from server.
+        :return:
+        """
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(941, 582)
@@ -927,6 +1031,11 @@ class Ui_MainWindow(QObject):
     # setupUi
 
     def retranslateUi(self, MainWindow):
+        """
+        Modifies fields of gui objects (like button text etc.).
+        :param MainWindow: (QMainWindow) main window of ui.
+        :return:
+        """
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
         self.left_side_profile_pic_label.setText("")
         self.left_side_username_label.setText(QCoreApplication.translate("MainWindow", u"Username", None))
@@ -1006,6 +1115,10 @@ class Ui_MainWindow(QObject):
     # retranslateUi
 
     def load_recommendations(self):
+        """
+        Load song and playlist recommendations into gui.
+        :return: None
+        """
         if self.recommendations_loaded:
             return
         self.recommendation_songs = self.search(SONG_RECOMMENDATION_PROMPT)
@@ -1019,6 +1132,10 @@ class Ui_MainWindow(QObject):
 
 
     def get_profile_pic(self):
+        """
+        Request profile picture from server and put response in PROFILE_PIC_PATH.
+        :return: None
+        """
         self.send_queue.put(REQUEST_PROFILE_PICTURE.encode())
         response = self.gui_msg_queue.get()
         with open(PROFILE_PIC_PATH, 'wb') as f:
@@ -1034,26 +1151,48 @@ class Ui_MainWindow(QObject):
 
 
     def search(self, prompt):
+        """
+        Is called when search button is clicked.
+        :param prompt: (str) text in search bar.
+        :return:
+        """
         return self.internal_search(SEARCH(prompt))
 
 
     def get_playlist_tracks(self, playlist):
+        """
+        Is called when a playlist is clicked.
+        :param playlist: (Record) playlist to request songs for.
+        :return:
+        """
         return self.internal_search(SEARCH_PLAYLIST_TRACKS(playlist))
 
 
     def internal_search(self, req):
+        """
+        Makes search request to server and processes response (search requests are used for getting song and playlist
+        recommendations for homepage, search bar search and getting the tracks of a playlist.
+        :param req: request to send to server.
+        :return: (list(Record)) list of results as Record objects.
+        """
         self.send_queue.put(req.encode())
-        record_names = self.process_search_response(self.gui_msg_queue.get().decode())
-        records_left = len(record_names)
-        records = [None for i in range(len(record_names))]
+        record_names = self.process_search_response(self.gui_msg_queue.get().decode())  # internal names of record search results
+        records_left = len(record_names)  # records left to request
+        records = [None for i in range(len(record_names))]  # records for returning
         while records_left > 0:
             curr_msg = self.gui_msg_queue.get()
             curr_record = self.process_fetch_response(curr_msg, self.get_next_pic_serial())
             records[record_names.index(curr_record.internal_name)] = curr_record
-            records_left -= 1
+            records_left -= 1  # process fetch responses for each record and add to records in appropriate place.
         return records
 
     def process_search_response(self, msg):
+        """
+        Process response to a search request and request fetch of all records noted in response from server.
+        'request fetch' -> yields record's external name, picture, likes and listennings.
+        :param msg: response to search request.
+        :return: (list(str)) list of internal names of records.
+        """
         record_names = [record.split('\r\n')[1] for record in msg.split('#')[1:]]
         for record in record_names:
             self.send_queue.put(FETCH_RECORD(record).encode())
@@ -1061,24 +1200,39 @@ class Ui_MainWindow(QObject):
 
 
     def process_fetch_response(self, msg, serial):
-        split_msg = b''.join(msg.split(b'/')[2:]).split(b'&')
-        first_five_fields = split_msg[:5]
+        """
+        Process response to a fetch request. (fetch requests are defined in docstring of self.process_search_response)
+        :param msg: (bytes) response to request as bytestring.
+        :param serial: (int) serial number of path picture of record will be saved in.
+        :return:
+        """
+        split_msg = b''.join(msg.split(b'/')[2:]).split(b'&')  # split msg into fields (name, picture etc.)
+        first_five_fields = split_msg[:5]  # all fields but picture
         internal_name, external_name, likes, listennings, type_string = [field.split(b'=')[1] for field in first_five_fields]
-        type = STRING_TO_TYPE[type_string]
-        picture_data = msg[msg.find(b'&picture=') + len(b'&picture='):]
+        type = STRING_TO_TYPE[type_string]  # parse string into RecordType object
+        picture_data = msg[msg.find(b'&picture=') + len(b'&picture='):]  # picture data
         picture_path = RECORD_PIC_PATH(HOME_RECOMMENDATION_IDENTIFIER(serial))
         with open(picture_path, 'wb') as pic:
-            pic.write(picture_data)
+            pic.write(picture_data)  # save picture in appropriate file
         return Record(internal_name.decode(), external_name.decode(), picture_path, int(likes.decode()), int(listennings.decode()), serial, type)
 
 
     def pause_or_play(self):
+        """
+        Pause or play current song. (for pause/play button).
+        :return: None
+        """
         self.playing_paused = not self.playing_paused
         self.scrollbar_playing_event.pause_or_play()
         self.update_player(self.playing_paused)
 
 
     def update_player(self, paused):
+        """
+        updates stream_player's events
+        :param paused: (bool) has playing just been paused or resumed.
+        :return: None
+        """
         if not paused:
             self.player_play_event.set()
         else:
@@ -1086,6 +1240,11 @@ class Ui_MainWindow(QObject):
 
 
     def change_time(self):
+        """
+        change time in current song.
+        called when user moves scrollbar.
+        :return: None
+        """
         val = self.scrollbar_val
         track_length, curr_time = self.scrollbar_playing_event.info
         self.scrollbar_playing_event.set((track_length, val / 1000 * track_length))
@@ -1097,12 +1256,23 @@ class Ui_MainWindow(QObject):
 
 
     def holding_slider(self, val):
+        """
+        Keep slider paused when user is holding it and update self.scrollbar val
+        for when change_time is called.
+        :param val: (int) scrollbar value (0-1000 scale)
+        :return: None
+        """
         self.scrollbar_val = val
         if not self.scrollbar_paused_event.isSet():
             self.scrollbar_playing_event.pause_or_play()
 
 
     def create_player(self):
+        """
+        Creates gui representation of player (the pause/play button and other buttons in bottom left,
+        played song picture label etc.
+        :return:
+        """
         #main horizontal layout
         self.CurrentTrackMainHorizontalLayout = QHBoxLayout()
         self.CurrentTrackMainHorizontalLayout.setObjectName(u"CurrentTrackMainHorizontalLayout")
@@ -1205,14 +1375,15 @@ class Ui_MainWindow(QObject):
 
     def go_to_page(self, n, m):
         '''
+        Go to a particular gui page.
         (1,1) - Sign Up
         (1, 2) - Sign In
         (2, 1) - Homepage
         (2, 2) - Search Page
         (2, 3) - Profile Page
         (2, 4) - Playlist Page
-        :param n:
-        :param m:
+        :param n: (int) 1 - before login, 2 - after login
+        :param m: (int) described above
         :return:
         '''
         if n == 1:
@@ -1232,39 +1403,53 @@ class Ui_MainWindow(QObject):
 
 
     def request_song(self, song):
-        self.current_song = song
+        """
+        Request song .m3u8 from server and initiate playing.
+        :param song: (Record) song to request.
+        :return: None
+        """
+        self.current_song = song  # set current song for general usage
         if self.playing_paused:
-            self.player_play_event.set()
+            self.player_play_event.set()  # make sure playing is not paused
         self.playing_paused = False
         self.expect_m3u8_and_url[0], self.expect_m3u8_and_url[1] = True, PRODUCE_SONG_PATH(song.internal_name)
         self.send_queue.put(SEND_FOR_SONGS(song.internal_name).encode())
-        self.player_fetching_event.set((None, 0, True))
+        self.player_fetching_event.set((None, 0, True))  # tell stream processor to expect audio and startup
         pixmap = QPixmap(song.picture_path)
         self.player_picture.setPixmap(pixmap)
         self.player_track_name.setText(song.external_name)
         self.player_track_likes.setText('likes: ' + str(song.likes))
-        self.player_track_listenings.setText('listennings: ' + str(song.listennings))
+        self.player_track_listenings.setText('listennings: ' + str(song.listennings))  # update gui representation of player
 
 
     def request_playlist(self, playlist):
+        """
+        Request tracks in a playlist, and present it in gui form.
+        :param playlist: (Record) object representing playlist.
+        :return:
+        """
         self.empty_playlist()
         tracks = self.get_playlist_tracks(playlist.internal_name)
         for track in tracks:
-            self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))
+            self.widgets.append(self.add_record_to_playlist(track, self.verticalLayout_28))  # add tracks to gui page
         if len(tracks) > 1:
             tracks[0].next = tracks[1]
-            tracks[len(tracks) - 1].prev = tracks[len(tracks) - 2]
+            tracks[len(tracks) - 1].prev = tracks[len(tracks) - 2]  # set track next and prev field for continuous playing
         for i in range(1, len(tracks) - 1):
             tracks[i].next = tracks[i + 1]
             tracks[i].prev = tracks[i - 1]
-        self.playlist_tracks = tracks
+        self.playlist_tracks = tracks  # field for general use
         self.playlist_picture_pixmap = QPixmap(playlist.picture_path)
         self.playlist_picture_label.setPixmap(self.playlist_picture_pixmap)
-        self.playlist_title_label.setText(playlist.external_name)
-        self.go_to_playlist()
+        self.playlist_title_label.setText(playlist.external_name)  # update playlist page header and main picture
+        self.go_to_playlist()  # go to gui playist page
 
 
     def empty_playlist(self):
+        """
+        Empty playlist page.
+        :return: None
+        """
         self.playlist_releasers.append(lambda: empty_layout(self.verticalLayout_28))
         finisher = get_finisher(self.playlist_releasers)
         finisher()
@@ -1272,6 +1457,10 @@ class Ui_MainWindow(QObject):
 
     @Slot()
     def play_next_song(self):
+        """
+        Play next song in playlist if there is one.
+        :return: None
+        """
         if (not self.current_song) or (not self.current_song.next):
             return
         self.request_song(self.current_song.next)
@@ -1279,11 +1468,22 @@ class Ui_MainWindow(QObject):
 
     @Slot()
     def play_prev_song(self):
+        """
+        Play previous song in playlist if there is one.
+        :return: None
+        """
         if (not self.current_song) or (not self.current_song.prev):
             return
         self.request_song(self.current_song.prev)
 
     def add_record_to_homepage(self, record, main_layout):
+        """
+        Add record to homepage recommendations. main_layout is vertical list to add
+        to - either self.homepage_albums_scroll or self.homepage_songs_scroll
+        :param record:
+        :param main_layout:
+        :return:
+        """
         name, picture_path, likes, listennings, record_type = record.external_name, record.picture_path, record.likes, record.listennings, record.type
         layout = QVBoxLayout()
         layout.setObjectName(str.format(u"homepage_song_ser_{}", self.serial))
@@ -1327,6 +1527,11 @@ class Ui_MainWindow(QObject):
 
 
     def change_upload_playlist_picture(self, default=False):
+        """
+        Change picture of upload playlist. Ask new picture path from user via gui.
+        :param default: (bool) should this change be to default.
+        :return:
+        """
         if default:
             pic_path = DEFAULT_UPLOAD_PLAYLIST_PIC
         else:
@@ -1335,14 +1540,18 @@ class Ui_MainWindow(QObject):
             return
         with open(pic_path, 'rb') as input:
             with open(UPLOAD_PLAYLIST_PIC, 'wb') as output:
-                output.write(input.read())
+                output.write(input.read())  # write new picture into fixed upload playlist picture path
         self.upload_playlist.set_picture(UPLOAD_PLAYLIST_PIC)
         pixmap = QPixmap(UPLOAD_PLAYLIST_PIC)
         self.upload_picture_label.setScaledContents(True)
-        self.upload_picture_label.setPixmap(pixmap)
+        self.upload_picture_label.setPixmap(pixmap)  # upload header picture etc.
 
 
     def add_song_to_upload_playlist(self):
+        """
+        Request path of song to add from user in gui form and add to uplaod playlist.
+        :return: None
+        """
         filename, filter = QFileDialog.getOpenFileName(parent=self.MainWindow, caption='Open file', dir='.', filter='*.wav')
         if not filename:
             return
@@ -1353,6 +1562,11 @@ class Ui_MainWindow(QObject):
 
 
     def add_record_to_upload_playlist(self, record):
+        """
+        Physically add song to upload_playlist gui.
+        :param record: (Record) song to add.
+        :return: GuiComponents obj representing song gui aspects, delete button for song, for connecting actions.
+        """
         widgets = self.add_record_to_vertical_list(record, self.upload_page_scrolllayout, None)
         layout = widgets[0]
 
@@ -1366,6 +1580,11 @@ class Ui_MainWindow(QObject):
 
         delete = get_finisher([lambda: remove_from_layout(self.upload_page_scrolllayout, layout)])
         def set_gui_comp_pic(pic_path):
+            """
+            load_picture function for GuiComponents
+            :param pic_path: path of picture to set for gui.
+            :return: None
+            """
             icon = QIcon()
             icon.addFile(pic_path)
             widgets[1].setIcon(icon)
@@ -1374,17 +1593,38 @@ class Ui_MainWindow(QObject):
         return gui_components, delete_button
 
     def add_record_to_playlist(self, record, main_layout, release_picture=True):
+        """
+        Add record to playlist page.
+        :param record: (Record)
+        :param main_layout: Layout to add to.
+        :param release_picture: (releaser function for picture's file's serial num etc. If it's none then no release is added to self.playlist_releasers.
+        :return: list of widgets associated with added song.
+        """
         if release_picture:
             self.playlist_releasers.append(self.get_release_for_picture(record.pic_serial, record.picture_path))
         return self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_4)
 
     def add_record_to_search_zone(self, record, main_layout, release_picture=True):
+        """
+        Add record to search results in gui.
+        :param record: (Record)
+        :param main_layout: (QLayout) layout to add to.
+        :param release_picture: releaser function for picture.
+        :return:
+        """
         if release_picture:
             self.search_releasers.append(self.get_release_for_picture(record.pic_serial, record.picture_path))
         self.add_record_to_vertical_list(record, main_layout, self.scrollAreaWidgetContents_3)
 
 
     def add_record_to_vertical_list(self, record, main_layout, parent):
+        """
+        Add record to a vertical list of records on gui (search results, playlist tracks, upload playlist tracks)
+        :param record: (Record)
+        :param main_layout: Layout to add to.
+        :param parent: parent for widgets.
+        :return:
+        """
         name, picture_path = record.external_name, record.picture_path
 
         #set up layout
@@ -1427,6 +1667,10 @@ class Ui_MainWindow(QObject):
 
 
     def sign_in(self):
+        """
+        Handle sign in (including captcha). Invoked by Sign In button.
+        :return: None
+        """
         msg = str.format(SIGN_IN, self.username_for_sign_in.text(), self.password_for_sign_in.text()).encode()
         credentials = (self.username_for_sign_in.text(), self.password_for_sign_in.text())
         successful, cause = self.log_in(credentials, msg)
@@ -1438,6 +1682,10 @@ class Ui_MainWindow(QObject):
             self.sign_in_label.setText(CREDENTIAL_TOO_LONG_MSG)
 
     def sign_up(self):
+        """
+        Handle Sign Up (including captcha). Invoked by Sign Up button.
+        :return:
+        """
         msg = str.format(SIGN_UP, self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text()).encode()
         credentials = (self.username_for_sign_up.text(), self.password_for_sign_up.text(), self.email_for_sign_up.text())
         successful, cause = self.log_in(credentials, msg)
@@ -1452,6 +1700,12 @@ class Ui_MainWindow(QObject):
 
 
     def log_in(self, credentials, msg):
+        """
+        Handle sign in/up including captcha.
+        :param credentials: (list(str)) credentials delivered.
+        :param msg: sign in/up msg ti send to server after passing captcha.
+        :return: (bool) successful or not, (str) indicating cause of failiure.
+        """
         username = credentials[0]
         for credential in credentials:
             if len(credential) > 64:
@@ -1476,11 +1730,19 @@ class Ui_MainWindow(QObject):
 
 
     def solve_captcha(self):
+        """
+        To invoke to force user to solve a captcha.
+        :return: (bool) was captcha solved successfuly
+        """
         self.request_captcha()
         return self.get_captcha_response(CAPTCHA_PATH)
 
 
     def upload(self):
+        """
+        Upload the upload playlist to the server.
+        :return: None
+        """
         if self.upload_page_playlist_name.toPlainText() == '':
             return
         request = construct_upload_playlist_request(UPLOAD_PLAYLIST_PIC, self.upload_playlist, self.upload_page_playlist_name.toPlainText())
@@ -1491,12 +1753,21 @@ class Ui_MainWindow(QObject):
 
 
     def process_upload_response(self):
+        """
+        Hnale upload request response.
+        :return:
+        """
         response = self.upload_resp_queue.get()
         self.upload_done_signal.emit(response)
 
 
     @Slot(bytes)
     def end_upload(self, response):
+        """
+        react to upload response.
+        :param response: (str) response to upload by server
+        :return: None
+        """
         msg = QMessageBox()
         self.upload_page_upload_stacked_widget.setCurrentWidget(self.upload_page_before_upload)
         if response == PLAYLIST_UPLOAD_OK:
@@ -1528,6 +1799,11 @@ class Ui_MainWindow(QObject):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.HomeRightSide)
 
     def go_to_search(self, prompt):
+        """
+        Invoked when search bar is clicked.
+        :param prompt: text from search bar.
+        :return: None
+        """
         self.empty_search()
         records = self.search(prompt)
         for record in records:
@@ -1536,6 +1812,10 @@ class Ui_MainWindow(QObject):
 
 
     def empty_search(self):
+        """
+        Empty search result page.
+        :return: None
+        """
         self.search_releasers.append(lambda: empty_layout(self.verticalLayout_30))
         finisher = get_finisher(self.search_releasers)
         finisher()
@@ -1557,6 +1837,13 @@ class Ui_MainWindow(QObject):
 
 
     def set_scrollbar_value(self, val, current_time, total_length):
+        """
+        for playing.
+        :param val: (float) (0-1)
+        :param current_time: (float) in seconds.
+        :param total_length: (float) in seconds.
+        :return:
+        """
         self.player_scrollbar.setValue(1000 * val)
         self.player_track_name.setText(PLAYER_SONG_NAME_TEXT(str(datetime.timedelta(seconds=int(current_time))), str(datetime.timedelta(seconds=int(total_length))), self.current_song.external_name))
 
@@ -1568,6 +1855,11 @@ class Ui_MainWindow(QObject):
         return release_picture
 
     def get_captcha_response(self, captcha_pic_path):
+        """
+        Handle captcha solving, including multiple failiures.
+        :param captcha_pic_path: path for initial capthc.
+        :return: (bool) did user solve.
+        """
         output = [False]
 
         #create window
@@ -1579,6 +1871,13 @@ class Ui_MainWindow(QObject):
         return output[0]
 
     def submit_captcha(self, window, output, solution):
+        """
+        Invoked when submitting captcha solution to server.
+        :param window: (Captcha_Window) captcha window
+        :param output: (list(bool)) of length 1 - item signifies solution success.
+        :param solution: (str) solution to submit to server.
+        :return:
+        """
         self.send_queue.put(CAPTCHA_SUBMITION_PREFIX(solution))
         response = self.gui_msg_queue.get()
         if response == CAPTCHA_SOLUTION_ACCEPTED:
@@ -1591,6 +1890,10 @@ class Ui_MainWindow(QObject):
 
 
     def request_captcha(self):
+        """
+        Request captcha from server and save in CAPTCHA_PATH
+        :return: None
+        """
         self.send_queue.put(CAPTCHA_REQUEST)
         response = self.gui_msg_queue.get()
         image = response[len(CAPTCHA_MSG_PREFIX):]
