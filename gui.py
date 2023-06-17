@@ -673,25 +673,6 @@ class Ui_MainWindow(QObject):
         self.horizontalLayout_41.setObjectName(u"horizontalLayout_41")
         self.verticalLayout_29 = QVBoxLayout()
         self.verticalLayout_29.setObjectName(u"verticalLayout_29")
-        self.profile_song = QHBoxLayout()
-        self.profile_song.setObjectName(u"profile_song")
-        self.pushButton_7 = QPushButton(self.scrollAreaWidgetContents_6)
-        self.pushButton_7.setObjectName(u"pushButton_7")
-        self.sizePolicy2.setHeightForWidth(self.pushButton_7.sizePolicy().hasHeightForWidth())
-        self.pushButton_7.setSizePolicy(self.sizePolicy2)
-        self.pushButton_7.setMinimumSize(QSize(70, 70))
-        self.pushButton_7.setMaximumSize(QSize(70, 70))
-        self.pushButton_7.setIconSize(QSize(80, 80))
-
-        self.profile_song.addWidget(self.pushButton_7)
-
-        self.label_33 = QLabel(self.scrollAreaWidgetContents_6)
-        self.label_33.setObjectName(u"label_33")
-
-        self.profile_song.addWidget(self.label_33)
-
-
-        self.verticalLayout_29.addLayout(self.profile_song)
 
 
         self.horizontalLayout_41.addLayout(self.verticalLayout_29)
@@ -964,9 +945,7 @@ class Ui_MainWindow(QObject):
         self.profile_my_profile_label.setText(QCoreApplication.translate("MainWindow", u"My Profile:", None))
         self.profile_picture_label.setText("")
         self.profile_username_label.setText(QCoreApplication.translate("MainWindow", u"Username", None))
-        self.label_8.setText(QCoreApplication.translate("MainWindow", u"My Playlists:", None))
-        self.pushButton_7.setText("")
-        self.label_33.setText(QCoreApplication.translate("MainWindow", u"Song1", None))
+        self.label_8.setText(QCoreApplication.translate("MainWindow", u"", None))
         self.player_picture.setText("")
         self.player_track_name.setText(QCoreApplication.translate("MainWindow", u"Playing: ...", None))
         self.player_track_likes.setText(QCoreApplication.translate("MainWindow", u"Likes:               ", None))
