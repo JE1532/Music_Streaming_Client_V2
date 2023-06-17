@@ -80,6 +80,10 @@ class SocketWrapper:
 
 
     def process_http(self):
+        """
+        Process and return entire http message from server.
+        :return: (bytes) entire http message received.
+        """
         headers, sub = self.receive_until([END_OF_HEADERS])
         http_msg = bytearray(HTTP + headers + END_OF_HEADERS)
         content_length_and_on = headers[headers.find(LENGTH) + len(LENGTH):]
@@ -89,6 +93,10 @@ class SocketWrapper:
 
 
     def process_regular(self):
+        """
+        Process and return non-http message from server.
+        :return: (bytes) message received
+        """
         length_string, sub = self.receive_until([SUFFIX])
         msg = self.receive_bytes(int(length_string.decode()))
         return msg
@@ -98,6 +106,12 @@ class SocketWrapper:
 
 
 def first(st, sub_lst):
+    """
+    Return index of first character of first string from sub_list appearing in st.
+    :param st: (bytes)
+    :param sub_lst: (bytes)
+    :return: (int) index described above)
+    """
     ind = -1
     first_sub = b''
     for sub in sub_lst:

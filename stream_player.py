@@ -14,6 +14,16 @@ TERMINATE = 'exit!'
 
 
 def player(play_queue, pause_event, play_event, change_track_event, play_next_song_signal, file_system_clear_approved):
+    """
+    Runs Stream_Player thread. Blocks.
+    :param play_queue: (Queue) of (file_path, num_channels) of audio to play (num_channels = number of audio channels in file, is None unless changed since last file)
+    :param pause_event: (threading.Event) triggered when playing is paused.
+    :param play_event: (threading.Event) triggered when playing is resumed.
+    :param change_track_event: (threading.Event) triggered when changing song.
+    :param play_next_song_signal: (Pyside6.QtCore.Signal) emitted when current song is done playing.
+    :param file_system_clear_approved: (threading.Event) triggered when player is not using file system.
+    :return:
+    """
     p = pyaudio.PyAudio()
     num_channels = None
     output = None

@@ -26,7 +26,15 @@ TERMINATE = 'exit!'
 
 
 class FileSystemWrapper:
+    """
+    ThreadSafe non-reentrant file system wrapper for automatic clearing of unused file paths.
+    """
     def __init__(self, path_maker, segment_name):
+        """
+        initialize wrapper.
+        :param path_maker: (function int -> str) makes a path in actual file system from a serial number. Paths made by this should not be written to by others.
+        :param segment_name:
+        """
         self.path_maker = path_maker
         self.segment_name = segment_name
         self.segname_to_filename = dict()
@@ -36,6 +44,12 @@ class FileSystemWrapper:
 
 
     def save(self, segname, data):
+        """
+        Save a segment named segname with data in it.
+        :param segname: (str) name of segment for future reference.
+        :param data: (bytes) byte data of file to save.
+        :return:
+        """
         self.lock.acquire()
         if len(self.available_filenames) == 0:
             filename = self.path_maker(self.next_filenum)
@@ -49,6 +63,12 @@ class FileSystemWrapper:
 
 
     def clear(self, wait_for=None):
+        """
+        clear wrapper and free all used paths. used paths are freed from a separate thread while this
+        class averts colisions between files to-be-deleted and files saved from now on.
+        :param wait_for: wait for an event before clearing.
+        :return:
+        """
         self.lock.acquire()
         filenames_for_clearing = set(self.segname_to_filename.values())
         self.segname_to_filename = dict()
@@ -58,6 +78,12 @@ class FileSystemWrapper:
 
 
     def free_filenames(self, filenames, wait_for):
+        """
+        Free filenames from a separate thread.
+        :param filenames:
+        :param wait_for:
+        :return:
+        """
         if wait_for:
             wait_for.wait()
             wait_for.clear()
@@ -66,6 +92,11 @@ class FileSystemWrapper:
 
 
     def free_filename(self, filename):
+        """
+        Free a particular used filename
+        :param filename:
+        :return:
+        """
         os.remove(filename)
         self.lock.acquire()
         self.available_filenames.add(filename)
@@ -73,10 +104,28 @@ class FileSystemWrapper:
 
 
     def get_path(self, segname):
+        """
+        Get actual path of a file from virtual name in wrapper
+        :param segname: (str)
+        :return:
+        """
         return self.segname_to_filename[segname]
 
 
 def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, playing_event, scrollbar_lock, fetch_change_event, player_change_track_event, file_system_clear_approved):
+    """
+    Runs Stream Processor thread. Blocks.
+    :param input_queue:
+    :param play_queue:
+    :param send_queue:
+    :param expect_m3u8_and_url:
+    :param playing_event:
+    :param scrollbar_lock:
+    :param fetch_change_event:
+    :param player_change_track_event:
+    :param file_system_clear_approved:
+    :return:
+    """
     playlist = Queue()
     time_into_first_segment = 0
     file_system_wrapper = FileSystemWrapper(SEGMENT, SEGMENT)
@@ -159,6 +208,13 @@ def stream_processor(input_queue, play_queue, send_queue, expect_m3u8_and_url, p
 
 
 def process_m3u8(data, dir, playlist):
+    """
+    Process a .m3u8 file and schedule requests to be made.
+    :param data: data of file.
+    :param dir: url dir of file.
+    :param playlist: request queue to insert to.
+    :return: (int) track length, (list(float)) segment end times in order, (list(bytes)) segment requests in order
+    """
     labels = data.split(b'#')
     track_length = 0
     segment_num = 0
@@ -181,6 +237,13 @@ def process_m3u8(data, dir, playlist):
 
 
 def process_m4a(data, segment_num, file_system_wrapper):
+    """
+    Process a .m4a file, save in filesystem as wav and return virtual segname.
+    :param data:
+    :param segment_num: number of segment.
+    :param file_system_wrapper:
+    :return:
+    """
     with open('input.ts', 'wb') as input_file_for_ffmpeg:
         input_file_for_ffmpeg.write(data)
     with open(os.devnull, 'rb') as devnull:
@@ -193,6 +256,15 @@ def process_m4a(data, segment_num, file_system_wrapper):
 
 
 def change_time(playlist, play_queue, segment_times, segment_reqs, new_time):
+    """
+    Change time currently playing - when user moves scrollbar.
+    :param playlist: request queue for server.
+    :param play_queue: queue of playable paths for Stream Player.
+    :param segment_times: segment end  time list
+    :param segment_reqs: segment request list
+    :param new_time: (float) new time
+    :return: (float) time into first segment to play from now on (in seconds)
+    """
     while not playlist.empty():
         playlist.get()
     while not play_queue.empty():
