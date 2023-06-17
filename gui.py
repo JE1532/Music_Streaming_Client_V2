@@ -161,6 +161,7 @@ def get_finisher(release_functions):
 SEND_FOR_SONGS = lambda name: f'GET /music/{name}/{name}.m3u8 HTTP/1.1\r\n\r\n'
 SIGN_UP = 'UserProcessor/SignUp?username={}&password={}&email={}@'
 SIGN_IN = 'UserProcessor/SignIn?username={}&password={}@'
+LOG_OUT = b'UserProcessor/LogOut@'
 SIGN_IN_LABEL = 'Please enter your username and password.'
 SIGN_UP_LABEL = 'Please enter your username, password and email.'
 SIGN_IN_LABEL_AFTER_FAIL = 'Wrong username or password. Please enter credentials again.'
@@ -1561,6 +1562,7 @@ class Ui_MainWindow(QObject):
         self.HomePageRightStackeddWidget.setCurrentWidget(self.ProfilePage)
 
     def log_out(self):
+        self.send_queue.put(LOG_OUT)
         self.MainStackWidget.setCurrentWidget(self.SignInOrUpPage)
 
 
