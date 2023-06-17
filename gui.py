@@ -1015,6 +1015,13 @@ class Ui_MainWindow(QObject):
         self.pic_serials = set()
         self.max_pic_serial = 0
 
+        self.recommendation_songs = []
+        self.recommendation_playlists = []
+
+
+    # retranslateUi
+
+    def load_recommendations(self):
         self.recommendation_songs = self.search(SONG_RECOMMENDATION_PROMPT)
         self.recommenation_albums = self.search(ALBUM_RECOMMENDATIONS_PROMPT)
         self.widgets = []
@@ -1022,9 +1029,6 @@ class Ui_MainWindow(QObject):
             self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5))
         for album in self.recommenation_albums:
             self.widgets.append(self.add_record_to_homepage(album, self.horizontalLayout_6))
-
-
-    # retranslateUi
 
 
     def get_profile_pic(self):
@@ -1480,6 +1484,7 @@ class Ui_MainWindow(QObject):
             self.left_side_profile_pic_label.setPixmap(self.profile_pixmap)
             self.profile_picture_label.setPixmap(self.profile_pixmap)
             self.profile_username_label.setText(username)
+            self.load_recommendations()
         return self.login_approved[0], CREDENTIALS
 
 
