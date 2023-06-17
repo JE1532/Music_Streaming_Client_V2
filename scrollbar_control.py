@@ -9,25 +9,48 @@ TERMINATE = 'exit!'
 
 
 class InfoEvent(Event):
+    """
+    Event that bears information (used exclusively in streaming mechanism)
+    """
     def __init__(self):
+        """
+        Initialize an infoEvent.
+        """
         super().__init__()
         self.info = None
-        self.is_pause_play = False
+        self.is_pause_play = False  # does current event activation indicate that audio plaing has been pause or resumed? (bool)
 
 
     def set(self, info):
+        """
+        set event and add info.
+        :param info: information for event.
+        :return: None
+        """
         self.info = info
         self.is_pause_play = False
         super().set()
 
 
     def pause_or_play(self):
+        """
+        Set event while indicating that the event indicated is a pause or resume of audio playing.
+        :return:
+        """
         self.is_pause_play = True
         super().set()
 
 
 
 def scrollbar_control(event, gui, scrollbar_lock, paused_event):
+    """
+    Executes scrollbar control thread.
+    :param event: (InfoEvent) for when the player moves the scrollbar.
+    :param gui: (Ui_MainQWindow) for accessing gui aspects of scrollbar.
+    :param scrollbar_lock: (threading.Lock)
+    :param paused_event: (threading.Event) triggered when playing is paused.
+    :return:
+    """
     currently_playing = False
     track_length, current_time = 0, datetime.timedelta(seconds=0)
     start = datetime.datetime.now()

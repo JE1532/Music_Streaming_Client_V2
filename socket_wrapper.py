@@ -10,12 +10,24 @@ REGULAR_PREFIX = 'length='
 
 
 class SocketWrapper:
+    """
+    Wrapper for socket that admits only one message from server at a time.
+    """
     def __init__(self, sock):
+        """
+        initialize wrapper.
+        :param sock:
+        """
         self.sock = sock
         self.buffer = bytearray()
 
 
     def receive_until(self, sub_list):
+        """
+        Receive from socket until first appearence of any string from sub_list and add to buffer.
+        :param sub_list: (list(bytes)) list of substring to receive until.
+        :return: None
+        """
         datalist = bytearray()
         prev_chunk = b''
         curr_chunk = bytes(self.buffer)
@@ -33,6 +45,11 @@ class SocketWrapper:
 
 
     def receive_bytes(self, n):
+        """
+        Receive and return n bytes.
+        :param n: (int) number of bytes to receive
+        :return: (bytes) bytes received.
+        """
         if len(self.buffer) >= n:
             value = self.buffer[:n]
             self.buffer = self.buffer[n:]
@@ -49,6 +66,10 @@ class SocketWrapper:
 
 
     def recv(self):
+        """
+        Receive a single message from server.
+        :return: (bytes) message received.
+        """
         prefix = self.receive_bytes(len(HTTP))
         if prefix == NOT_HTTP:
             return self.process_regular()
