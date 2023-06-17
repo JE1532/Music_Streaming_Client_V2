@@ -54,5 +54,5 @@ def scrollbar_control(event, gui, scrollbar_lock, paused_event):
                     paused_event.set()
                 event.clear()
             current_time = datetime.datetime.now() - start
-            gui.set_scrollbar_value(current_time.total_seconds() / track_length)
+            gui.set_scrollbar_value(current_time.total_seconds() / track_length, current_time.total_seconds(), track_length)
         time.sleep(TIME_STEP)

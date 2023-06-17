@@ -195,6 +195,8 @@ CAPTCHA = 'captcha'
 CREDENTIAL_TOO_LONG = 'credential_too_long'
 CREDENTIAL_TOO_LONG_MSG = 'One of your credentials exceeded permitted length.\r\n Credential length must not exceed 64 characters. Please try again.'
 
+PLAYER_SONG_NAME_TEXT = lambda current_time, total_length, song_name: f"{song_name}     {current_time}/{total_length}"
+
 PRODUCE_SONG_PATH = lambda name: f"music/{name}/{name}.m3u8"
 DEFAULT_UPLOAD_PLAYLIST_PIC = 'default_upload_playlist_pic.jpg'
 UPLOAD_PLAYLIST_PIC = 'upload_playlist_pic.png'
@@ -1018,11 +1020,14 @@ class Ui_MainWindow(QObject):
 
         self.recommendation_songs = []
         self.recommendation_playlists = []
+        self.recommendations_loaded = False
 
 
     # retranslateUi
 
     def load_recommendations(self):
+        if self.recommendations_loaded:
+            return
         self.recommendation_songs = self.search(SONG_RECOMMENDATION_PROMPT)
         self.recommenation_albums = self.search(ALBUM_RECOMMENDATIONS_PROMPT)
         self.widgets = []
@@ -1030,6 +1035,7 @@ class Ui_MainWindow(QObject):
             self.widgets.append(self.add_record_to_homepage(song, self.horizontalLayout_5))
         for album in self.recommenation_albums:
             self.widgets.append(self.add_record_to_homepage(album, self.horizontalLayout_6))
+        self.recommendations_loaded = True
 
 
     def get_profile_pic(self):
@@ -1570,8 +1576,9 @@ class Ui_MainWindow(QObject):
         self.MainStackWidget.setCurrentWidget(page)
 
 
-    def set_scrollbar_value(self, val):
+    def set_scrollbar_value(self, val, current_time, total_length):
         self.player_scrollbar.setValue(1000 * val)
+        self.player_track_name.setText(PLAYER_SONG_NAME_TEXT(int(current_time), int(total_length), self.current_song.external_name))
 
 
     def get_release_for_picture(self, pic_serial, pic_path):
